@@ -74,7 +74,7 @@ export default function Home(){
         })
         // Stage 2: verify in small parallel batches. Each Gemini call only researches 3 brands,
         // which gives much better outlet coverage than asking one call to investigate 12.
-        const deepTargets=screened.filter(x=>!x.automaticReject).slice(0,12)
+        const deepTargets=screened.filter(x=>!x.automaticReject&&Number(x.reviews||0)>=minReviews)
         setMessage(`Brand screen done · deeply verifying ${deepTargets.length} candidates…`)
         const chunks=[]
         for(let i=0;i<deepTargets.length;i+=3) chunks.push(deepTargets.slice(i,i+3))
@@ -114,8 +114,25 @@ export default function Home(){
     finally{setLoading(false)}
   }
 
-  const visible=useMemo(()=>results.filter(r=>r.reviews>=minReviews&&!rejected.includes(r.id)&&r.fitStatus!=='REJECT'&&!r.automaticReject&&!r.tooBigForCravoe),[results,minReviews,rejected])
-  const filteredOut=useMemo(()=>results.filter(r=>r.fitStatus==='REJECT'||r.automaticReject||r.tooBigForCravoe),[results])
+  const visible=useMemo(()=>results.filter(r=>
+    r.reviews>=minReviews &&
+    !rejected.includes(r.id) &&
+    r.researched===true &&
+    ['STRONG_FIT','POSSIBLE_FIT','REVIEW'].includes(r.fitStatus) &&
+    !r.automaticReject &&
+    !r.tooBigForCravoe
+  ),[results,minReviews,rejected])
+
+  const filteredOut=useMemo(()=>results.filter(r=>
+    r.fitStatus==='REJECT' || r.automaticReject || r.tooBigForCravoe
+  ),[results])
+
+  const stillVerifying=useMemo(()=>results.filter(r=>
+    r.reviews>=minReviews &&
+    !r.automaticReject &&
+    !r.tooBigForCravoe &&
+    r.researched!==true
+  ),[results,minReviews])
 
   function saveLead(lead){
     if(saved.some(s=>s.id===lead.id)) return
@@ -161,7 +178,8 @@ export default function Home(){
     <section className="content-grid">
       <div>
         <div className="section-title"><span>CANDIDATES</span><h3>{visible.length?`${visible.length} matches`:'Ready to scout'}</h3></div>
-        {!visible.length&&<div className="empty"><strong>Pick a cuisine and area</strong><p>Try Gariahat, Ballygunge, Bhawanipur or Park Circus.</p></div>}
+        {!visible.length&&!loading&&!stillVerifying.length&&<div className="empty"><strong>No verified Cravoe-fit leads yet</strong><p>Try another cuisine/area or lower the review threshold.</p></div>}
+        {!!stillVerifying.length&&<div className="verifying-box"><strong>Verifying {stillVerifying.length} more candidate{stillVerifying.length===1?'':'s'}…</strong><span>They will not appear as leads until brand size and Cravoe fit are checked.</span></div>}
         <div className="cards">
           {visible.map((lead,i)=><LeadCard key={lead.id} lead={lead} rank={i+1} saved={saved.some(s=>s.id===lead.id)} onSave={saveLead} onReject={rejectLead} onCopy={copyPhone}/>)}
         </div>
