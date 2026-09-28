@@ -28,29 +28,28 @@ export async function POST(request){
     const apiKey=process.env.GOOGLE_PLACES_API_KEY
     if(!apiKey) return NextResponse.json({error:'Google Places API key missing'},{status:503})
 
-    const response=await fetch('https://places.googleapis.com/v1/places:searchText',{
+    const queries=[
+      `"${lead.name}" restaurant Kolkata West Bengal India`,
+      `${lead.name} outlets Kolkata`,
+      `${lead.name} branches Kolkata`,
+      `${lead.name} restaurant West Bengal`
+    ]
+    const calls=await Promise.allSettled(queries.map(textQuery=>fetch('https://places.googleapis.com/v1/places:searchText',{
       method:'POST',
       headers:{
         'Content-Type':'application/json',
         'X-Goog-Api-Key':apiKey,
         'X-Goog-FieldMask':'places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.websiteUri,places.businessStatus'
       },
-      body:JSON.stringify({
-        textQuery:`"${lead.name}" restaurant Kolkata West Bengal India`,
-        languageCode:'en',
-        regionCode:'IN',
-        pageSize:20
-      }),
+      body:JSON.stringify({textQuery,languageCode:'en',regionCode:'IN',pageSize:20}),
       cache:'no-store'
-    })
+    }).then(async response=>{
+      if(!response.ok) throw new Error(await response.text())
+      return (await response.json()).places||[]
+    })))
 
-    if(!response.ok){
-      const err=await response.text()
-      return NextResponse.json({error:`Google brand scan failed: ${err.slice(0,400)}`},{status:response.status})
-    }
-
-    const data=await response.json()
-    const matches=(data.places||[])
+    const rawPlaces=calls.flatMap(x=>x.status==='fulfilled'?x.value:[])
+    const matches=rawPlaces
       .filter(p=>p.businessStatus!=='CLOSED_PERMANENTLY')
       .filter(p=>sameBrand(lead.name,p.displayName?.text||''))
       .map(p=>({
@@ -72,8 +71,8 @@ export async function POST(request){
     const outletCount=unique.length
     const maxReviews=Math.max(Number(lead.reviews||0),...unique.map(x=>x.reviews),0)
     const multiOutlet=outletCount>=2
-    const automaticReject=outletCount>=3
-    const famousSignal=maxReviews>=8000
+    const automaticReject=outletCount>=3 || maxReviews>=12000
+    const famousSignal=maxReviews>=6000
     let quickFit='PROMISING'
     if(automaticReject) quickFit='TOO BIG'
     else if(multiOutlet) quickFit='SMALL GROUP'
