@@ -3,5 +3,12 @@
   "version":"1.0.0",
   "private":true,
   "scripts":{"dev":"next dev","build":"next build","start":"next start"},
-  "dependencies":{"next":"latest","react":"19.2.0","react-dom":"19.2.0"}
+  "dependencies":{
+    "@google/genai":"^2.24.0",
+    "@vercel/oidc":"^3.8.9",
+    "google-auth-library":"^10.9.1",
+    "next":"latest",
+    "react":"19.2.0",
+    "react-dom":"19.2.0"
+  }
 }
