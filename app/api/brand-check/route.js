@@ -71,8 +71,8 @@ export async function POST(request){
     const outletCount=unique.length
     const maxReviews=Math.max(Number(lead.reviews||0),...unique.map(x=>x.reviews),0)
     const multiOutlet=outletCount>=2
-    const automaticReject=outletCount>=3 || maxReviews>=12000
     const famousSignal=maxReviews>=6000
+    const automaticReject=outletCount>=3 || maxReviews>=8000
     let quickFit='PROMISING'
     if(automaticReject) quickFit='TOO BIG'
     else if(multiOutlet) quickFit='SMALL GROUP'
@@ -80,9 +80,10 @@ export async function POST(request){
 
     let score=Number(lead.score||0)
     if(outletCount>=5) score=Math.min(score,25)
-    else if(outletCount>=3) score=Math.min(score,38)
-    else if(outletCount===2) score=Math.min(score,78)
-    if(famousSignal&&!automaticReject) score=Math.min(score,72)
+    else if(outletCount>=3) score=Math.min(score,35)
+    else if(outletCount===2) score=Math.min(score,76)
+    if(maxReviews>=8000) score=Math.min(score,35)
+    else if(famousSignal) score=Math.min(score,62)
 
     return NextResponse.json({
       brandChecked:true,
@@ -91,6 +92,7 @@ export async function POST(request){
       multiOutlet,
       automaticReject,
       famousSignal,
+      establishedVisibilityReject:maxReviews>=8000,
       quickFit,
       score,
       brandScanReason:automaticReject
