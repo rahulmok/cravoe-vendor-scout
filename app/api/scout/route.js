@@ -27,7 +27,12 @@ function scorePlace(place,cuisine,area){
   else if(reviews>3000) sizeScore=6
   else if(reviews>1500) sizeScore=9
   else if(reviews>=150) sizeScore=15
-  return Math.max(0,Math.min(100,Math.round(ratingScore+reviewScore+cuisineScore+areaScore+contactScore+webScore+sizeScore)))
+  let total=Math.max(0,Math.min(100,Math.round(ratingScore+reviewScore+cuisineScore+areaScore+contactScore+webScore+sizeScore)))
+  // Cravoe is scouting hidden gems, not the most famous restaurant on Google.
+  if(reviews>=12000) total=Math.min(total,52)
+  else if(reviews>=7000) total=Math.min(total,62)
+  else if(reviews>=4000) total=Math.min(total,70)
+  return total
 }
 
 function reason(place,score){
@@ -35,6 +40,7 @@ function reason(place,score){
   bits.push(place.rating>=4.4?'excellent Google reputation':'solid 4★+ reputation')
   if(reviews>=150&&reviews<=3000) bits.push('strong hidden-gem review volume')
   else if(reviews<150) bits.push('smaller local footprint worth checking')
+  else if(reviews>=4000) bits.push('high-visibility brand — likely outside hidden-gem target')
   else bits.push('well-known locally, verify size before outreach')
   if(place.nationalPhoneNumber) bits.push('direct contact available')
   if(score>=80) bits.push('high Cravoe-fit score')
