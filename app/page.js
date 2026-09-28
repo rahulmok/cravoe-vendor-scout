@@ -121,6 +121,7 @@ function LeadCard({lead,rank,saved,onSave,onReject,onCopy}){
   const queryBase=`${lead.name} ${lead.area} Kolkata`
   return <article className="lead-card">
     <div className="rank">#{String(rank).padStart(2,'0')}</div>
+    {lead.photoName&&<a className="place-photo" href={lead.maps||'#'} target="_blank" rel="noreferrer"><img src={`/api/photo?name=${encodeURIComponent(lead.photoName)}`} alt={`${lead.name} Google Maps photo`} loading="lazy"/></a>}
     <div className="lead-body">
       <div className="lead-top">
         <div><div className="tier">{lead.score>=82?'HOT':lead.score>=70?'GOOD':'REVIEW'}</div><h3>{lead.name}</h3></div>
