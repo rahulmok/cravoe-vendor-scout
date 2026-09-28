@@ -55,9 +55,30 @@ export default function Home(){
       setMessage(data.message||`${baseResults.length} candidates found`)
 
       if(!data.demo&&baseResults.length){
-        setMessage(`Found ${baseResults.length} candidates · researching top leads…`)
-        const top=baseResults.slice(0,10)
-        const researched=await Promise.all(top.map(async lead=>{
+        // Stage 1: very fast deterministic Google Places brand-footprint scan.
+        // This catches obvious chains BEFORE we spend slow Gemini grounding calls on them.
+        setMessage(`Found ${baseResults.length} candidates · checking brand size…`)
+        const scanTargets=baseResults.slice(0,15)
+        const checked=await Promise.all(scanTargets.map(async lead=>{
+          try{
+            const rr=await fetch('/api/brand-check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(lead)})
+            const brand=await rr.json()
+            if(!rr.ok) return lead
+            return {...lead,...brand}
+          }catch{return lead}
+        }))
+        const untouched=baseResults.slice(15)
+        let screened=[...checked,...untouched].sort((a,b)=>{
+          if(Boolean(a.automaticReject)!==Boolean(b.automaticReject)) return a.automaticReject?1:-1
+          return Number(b.score||0)-Number(a.score||0)
+        })
+        setResults(screened)
+
+        // Stage 2: deep Gemini research ONLY the best non-chain candidates.
+        // Researching 4 in parallel is dramatically faster than grounding 10 restaurants.
+        const deepTargets=screened.filter(x=>!x.automaticReject).slice(0,4)
+        setMessage(`Brand screen done · deep-checking ${deepTargets.length} strongest hidden-gem candidates…`)
+        const researched=await Promise.all(deepTargets.map(async lead=>{
           try{
             const rr=await fetch('/api/research',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(lead)})
             const research=await rr.json()
@@ -65,10 +86,14 @@ export default function Home(){
             return {...lead,...research}
           }catch{return lead}
         }))
-        const rest=baseResults.slice(10)
-        const merged=[...researched,...rest].sort((a,b)=>Number(b.score||0)-Number(a.score||0))
-        setResults(merged)
-        setMessage(`LIVE · ${baseResults.length} candidates · top ${researched.length} researched & re-ranked`)
+        const researchMap=new Map(researched.map(x=>[x.id,x]))
+        screened=screened.map(x=>researchMap.get(x.id)||x).sort((a,b)=>{
+          if(Boolean(a.tooBigForCravoe||a.automaticReject)!==Boolean(b.tooBigForCravoe||b.automaticReject)) return (a.tooBigForCravoe||a.automaticReject)?1:-1
+          return Number(b.score||0)-Number(a.score||0)
+        })
+        setResults(screened)
+        const filtered=screened.filter(x=>x.automaticReject||x.tooBigForCravoe).length
+        setMessage(`${baseResults.length} found · ${filtered} obvious big/multi-outlet brands flagged · ${researched.length} best leads deeply researched`)
       }
     }catch(e){setMessage(e.message)}
     finally{setLoading(false)}
@@ -142,14 +167,19 @@ function LeadCard({lead,rank,saved,onSave,onReject,onCopy}){
     {lead.photoName&&<a className="place-photo" href={lead.maps||'#'} target="_blank" rel="noreferrer"><img src={`/api/photo?name=${encodeURIComponent(lead.photoName)}`} alt={`${lead.name} Google Maps photo`} loading="lazy"/></a>}
     <div className="lead-body">
       <div className="lead-top">
-        <div><div className="tier">{lead.score>=82?'HOT':lead.score>=70?'GOOD':'REVIEW'}</div>{lead.hiddenGem&&<div className="gem-badge">💎 HIDDEN GEM</div>}<h3>{lead.name}</h3></div>
+        <div><div className="tier">{lead.tooBigForCravoe||lead.automaticReject?'SKIP':lead.score>=82?'HOT':lead.score>=70?'GOOD':'REVIEW'}</div>{lead.hiddenGem&&<div className="gem-badge">💎 HIDDEN GEM</div>}{(lead.tooBigForCravoe||lead.automaticReject)&&<div className="reject-badge">🚫 TOO BIG FOR CRAVOE</div>}<h3>{lead.name}</h3></div>
         <div className="score"><strong>{lead.score}</strong><span>/100</span></div>
       </div>
       <div className="meta"><span>⭐ {lead.rating} <em>({Number(lead.reviews).toLocaleString('en-IN')})</em></span><span>📍 {lead.area}</span><span>🍽 {lead.cuisine}</span></div>
       <p className="address">{lead.address}</p>
       <p className="reason">{lead.reason}</p>
+      {lead.brandChecked&&<div className={`brand-scan ${lead.automaticReject?'bad':lead.multiOutlet?'warn':'good'}`}>
+        <strong>{lead.quickFit}</strong>
+        <span>{lead.brandScanReason}</span>
+        {!!lead.brandOutlets?.length&&<small>{lead.brandOutlets.slice(0,5).map(x=>x.address||x.name).join(' · ')}</small>}
+      </div>}
       {lead.researched&&<div className="research-box">
-        <div className="research-head"><span>GEMINI INDEPENDENT RESEARCH</span><b className={`size-badge ${lead.sizeTone||''}`}>{lead.sizeClass}</b></div>
+        <div className="research-head"><span>GEMINI INDEPENDENT RESEARCH</span><div className="research-head-badges">{lead.fitStatus&&<b className={`fit-badge ${lead.fitStatus==='AUTO REJECT'?'bad':lead.fitStatus==='STRONG FIT'?'great':'warning'}`}>{lead.fitStatus}</b>}<b className={`size-badge ${lead.sizeTone||''}`}>{lead.sizeClass}</b></div></div>
         <div className="research-stats">
           <span><strong>{lead.outletLabel||lead.estimatedOutlets}</strong> Kolkata outlet{lead.estimatedOutlets===1?'':'s'} supported</span>
           <span>{lead.hiddenGem?'💎 Hidden gem fit':`🔎 ${lead.outletConfidence||'unknown'} confidence`}</span>
