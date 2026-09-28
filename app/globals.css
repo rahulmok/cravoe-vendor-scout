@@ -65,3 +65,11 @@
   .research-stats{gap:8px 10px}
   .gem-badge{margin-left:5px}
 }
+
+.evidence-summary{color:#a9afa8!important;font-size:12px!important}
+.outlet-list{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.outlet-list span{font-size:10px;line-height:1.35;color:#c7cbc4;background:#171b17;border:1px solid #2a332b;border-radius:999px;padding:6px 8px}
+.research-sources{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.research-sources a{font-size:10px;color:#aeb7ff;text-decoration:none;border:1px solid #2c3154;background:#16182a;padding:6px 8px;border-radius:8px}
+.research-sources a:hover{border-color:#4a53a1;color:#d6d9ff}
+.research-error{margin:12px 0 4px;padding:10px 12px;border-radius:10px;background:#2a1b11;border:1px solid #5b351b;color:#e9ba8f;font-size:11px;line-height:1.5}
