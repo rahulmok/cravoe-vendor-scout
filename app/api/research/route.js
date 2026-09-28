@@ -169,9 +169,8 @@ Rules:
 5. If multiple restaurants have similar names, use address/cuisine/context to avoid mixing brands.
 6. Never invent an exact outlet count. If evidence is incomplete, use a conservative minimum and lower confidence.
 7. "Independent" should only be used when there is strong evidence that this is genuinely a one-outlet business. Otherwise use "Uncertain".
-8. Cravoe prefers highly rated, quality-focused, lesser-known restaurants and small local groups, not large established chains.
-9. Check whether the brand appears to be on Swiggy and Zomato.
-10. Return ONLY one JSON object and no markdown.
+8. Cravoe's target vendor is a hidden gem: usually an independent/owner-led restaurant or at most a very small local group. We are NOT trying to onboard famous institutional Kolkata brands, corporate dining groups, franchises, or established multi-outlet chains. A restaurant can be excellent and still be a bad Cravoe lead if it is already large, famous or operationally corporate.
+
 
 Use this exact JSON shape:
 {
@@ -227,15 +226,20 @@ Size guide:
     const estimatedOutlets=Math.max(1,Number(parsed.active_kolkata_outlets_min)||1)
     if(sizeClass==='Independent'&&(estimatedOutlets!==1||confidence!=='high')) sizeClass='Uncertain'
 
-    const hiddenGem=Boolean(parsed.hidden_gem)
-    const tooBigForCravoe=Boolean(parsed.too_big_for_cravoe)
+    const quickOutlets=Math.max(0,Number(lead.brandOutletCount||0))
+    const deterministicTooBig=quickOutlets>=3 || estimatedOutlets>=3 || sizeClass==='Growing chain' || sizeClass==='Large chain'
+    const tooBigForCravoe=Boolean(parsed.too_big_for_cravoe)||deterministicTooBig
+    const hiddenGem=Boolean(parsed.hidden_gem)&&!tooBigForCravoe
     const onSwiggy=Boolean(parsed.on_swiggy)
     const onZomato=Boolean(parsed.on_zomato)
 
     const researchDelta=calcDelta({
       sizeClass,hiddenGem,tooBigForCravoe,confidence,onSwiggy,onZomato
     })
-    const researchedScore=Math.max(0,Math.min(100,Math.round(Number(lead.score||0)+researchDelta)))
+    let researchedScore=Math.max(0,Math.min(100,Math.round(Number(lead.score||0)+researchDelta)))
+    if(tooBigForCravoe) researchedScore=Math.min(researchedScore,35)
+    else if(estimatedOutlets===2||quickOutlets===2) researchedScore=Math.min(researchedScore,78)
+    const fitStatus=tooBigForCravoe?'AUTO REJECT':hiddenGem&&estimatedOutlets<=2?'STRONG FIT':'REVIEW'
 
     const grounding=gemini.candidates?.[0]?.groundingMetadata||{}
     const sources=[]
@@ -271,6 +275,7 @@ Size guide:
       sizeTone:tone(sizeClass),
       hiddenGem,
       tooBigForCravoe,
+      fitStatus,
       onSwiggy,
       onZomato,
       evidenceSummary:String(parsed.evidence_summary||'Research completed.'),
