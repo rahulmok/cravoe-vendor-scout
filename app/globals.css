@@ -73,3 +73,17 @@
 .research-sources a{font-size:10px;color:#aeb7ff;text-decoration:none;border:1px solid #2c3154;background:#16182a;padding:6px 8px;border-radius:8px}
 .research-sources a:hover{border-color:#4a53a1;color:#d6d9ff}
 .research-error{margin:12px 0 4px;padding:10px 12px;border-radius:10px;background:#2a1b11;border:1px solid #5b351b;color:#e9ba8f;font-size:11px;line-height:1.5}
+
+.reject-badge{display:inline-block;margin-left:7px;background:#351919;color:#ffb0b0;border:1px solid #713636;padding:4px 8px;border-radius:999px;font-size:9px;font-weight:900;letter-spacing:.08em;vertical-align:middle}
+.brand-scan{margin:12px 0 4px;padding:11px 12px;border-radius:11px;display:flex;flex-direction:column;gap:4px;font-size:11px}
+.brand-scan strong{font-size:10px;letter-spacing:.11em}
+.brand-scan span{line-height:1.45}
+.brand-scan small{color:#777;line-height:1.45}
+.brand-scan.good{background:#121812;border:1px solid #263b29;color:#a9deb3}
+.brand-scan.warn{background:#2b230f;border:1px solid #5e4a1b;color:#e6c67a}
+.brand-scan.bad{background:#2d1717;border:1px solid #683131;color:#f0a0a0}
+.research-head-badges{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+.fit-badge{font-size:9px;padding:5px 8px;border-radius:999px;border:1px solid #3a3a3a}
+.fit-badge.great{background:#17301f;border-color:#2e5d3b;color:#a9e7ba}
+.fit-badge.warning{background:#33260e;border-color:#6a4f18;color:#efc676}
+.fit-badge.bad{background:#351919;border-color:#6a2e2e;color:#f0a1a1}
