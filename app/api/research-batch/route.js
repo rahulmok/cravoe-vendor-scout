@@ -45,7 +45,7 @@ export async function POST(request){
   try{
     if(!configured()) return NextResponse.json({error:'Vertex AI not configured'},{status:503})
     const body=await request.json()
-    const leads=Array.isArray(body.leads)?body.leads.slice(0,12):[]
+    const leads=Array.isArray(body.leads)?body.leads.slice(0,3):[]
     if(!leads.length) return NextResponse.json({results:[]})
 
     const compact=leads.map((x,i)=>({
@@ -88,13 +88,34 @@ BAD FIT EVEN IF FOOD IS EXCELLENT:
 Examples of the TYPE to reject: Oh! Calcutta, Koshe Kosha, Saptapadi when its multi-outlet/franchise footprint is evident. These examples are about scale/profile, not cuisine quality.
 
 TASK:
-Research ALL restaurants below using Google Search grounding. For each one, establish current Kolkata/Greater Kolkata footprint and Cravoe fit.
-Use official website/location pages first when available, then official social pages, Google/Maps search evidence, Swiggy/Zomato, credible directories/articles.
-Do not trust the supplied fast Places outlet count when external evidence contradicts it.
-Search specifically for brand name + outlets, locations, branches, franchise, official website, Kolkata.
-Never call a brand "hidden gem" merely because the selected listing itself is local.
-If official evidence shows 3+ outlets, franchising, or a clearly famous established city-wide brand, mark REJECT.
-If exact footprint is uncertain, be conservative and say REVIEW, not STRONG_FIT.
+Research EACH restaurant separately using Google Search grounding. Do not do a shallow one-query lookup.
+
+For every brand, run/consider searches equivalent to:
+- "<brand> outlets Kolkata"
+- "<brand> locations Kolkata"
+- "<brand> branches Kolkata"
+- "<brand> franchise"
+- "<brand> official website outlets"
+- "<brand> Swiggy Kolkata"
+- "<brand> Zomato Kolkata"
+
+Evidence priority:
+1. Official website location/outlet/contact pages
+2. Official brand social pages
+3. Swiggy/Zomato brand outlet listings
+4. Google/Maps search evidence
+5. Credible directories/articles only as backup
+
+IMPORTANT:
+- Count the BRAND footprint, not only the selected branch.
+- If different credible sources show different outlet counts, use the highest currently-supported minimum and explain the conflict.
+- A delivery platform showing 4–5 city outlets is enough to reject even if Google Places only found 1–2.
+- Franchise pages or active franchise solicitation are strong "too established" signals.
+- Do not trust the supplied fast Places outlet count when external evidence contradicts it.
+- Never call a brand "hidden gem" merely because one branch looks local.
+- If evidence shows 3+ outlets, franchising, or a clearly famous established city-wide brand, mark REJECT.
+- If exact footprint is uncertain, be conservative and say REVIEW, not STRONG_FIT.
+- A restaurant can have excellent food and still be a bad Cravoe acquisition target.
 
 Return ONLY JSON:
 {
@@ -102,6 +123,8 @@ Return ONLY JSON:
     {
       "id":"same id",
       "outlet_count_min":1,
+      "official_outlet_count_min":0,
+      "delivery_platform_outlet_count_min":0,
       "outlet_locations":["area"],
       "size_class":"Independent|Small group|Growing chain|Large chain|Uncertain",
       "fit_status":"STRONG_FIT|POSSIBLE_FIT|REVIEW|REJECT",
@@ -142,7 +165,13 @@ ${JSON.stringify(compact)}
     const results=rows.map(r=>{
       const lead=byId.get(String(r.id))
       if(!lead) return null
-      const outlets=Math.max(1,Number(r.outlet_count_min)||1)
+      const evidenceCounts=[
+        Number(r.outlet_count_min)||0,
+        Number(r.official_outlet_count_min)||0,
+        Number(r.delivery_platform_outlet_count_min)||0,
+        Number(lead.brandOutletCount)||0
+      ]
+      const outlets=Math.max(1,...evidenceCounts)
       const famous=Boolean(r.famous_brand)
       const franchise=Boolean(r.franchise_signal)
       const deterministicReject=outlets>=3||famous||franchise||['Growing chain','Large chain'].includes(r.size_class)
@@ -162,6 +191,8 @@ ${JSON.stringify(compact)}
         researchProvider:'Vertex Gemini batch research',
         estimatedOutlets:outlets,
         outletLabel:`At least ${outlets}`,
+        officialOutletCount:Math.max(0,Number(r.official_outlet_count_min)||0),
+        deliveryPlatformOutletCount:Math.max(0,Number(r.delivery_platform_outlet_count_min)||0),
         outletLocations:Array.isArray(r.outlet_locations)?r.outlet_locations.slice(0,12):[],
         sizeClass:r.size_class||'Uncertain',
         fitStatus,
