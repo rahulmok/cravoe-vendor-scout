@@ -97,3 +97,7 @@
 .research-reject{background:#1b1111;border-color:#4c2929}
 .fit-reason{color:#d7d9d4!important;font-weight:700}
 @media(max-width:760px){.filtered-item{flex-direction:column}.filtered-item b{align-self:flex-start}}
+
+.verifying-box{margin:14px 0 18px;padding:14px 16px;border:1px solid #2a3140;background:#121720;border-radius:12px;display:flex;flex-direction:column;gap:4px}
+.verifying-box strong{font-size:12px;color:#d9e2ff}
+.verifying-box span{font-size:11px;color:#8993aa}
