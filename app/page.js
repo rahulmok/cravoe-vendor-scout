@@ -49,9 +49,27 @@ export default function Home(){
       const res=await fetch('/api/scout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cuisine,area,minRating:4})})
       const data=await res.json()
       if(!res.ok) throw new Error(data.error||'Search failed')
-      setResults(data.results||[])
+      const baseResults=data.results||[]
+      setResults(baseResults)
       setDemo(Boolean(data.demo))
-      setMessage(data.message||`${data.results?.length||0} candidates found`)
+      setMessage(data.message||`${baseResults.length} candidates found`)
+
+      if(!data.demo&&baseResults.length){
+        setMessage(`Found ${baseResults.length} candidates · researching top leads…`)
+        const top=baseResults.slice(0,10)
+        const researched=await Promise.all(top.map(async lead=>{
+          try{
+            const rr=await fetch('/api/research',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(lead)})
+            if(!rr.ok) return lead
+            const research=await rr.json()
+            return {...lead,...research}
+          }catch{return lead}
+        }))
+        const rest=baseResults.slice(10)
+        const merged=[...researched,...rest].sort((a,b)=>Number(b.score||0)-Number(a.score||0))
+        setResults(merged)
+        setMessage(`LIVE · ${baseResults.length} candidates · top ${researched.length} researched & re-ranked`)
+      }
     }catch(e){setMessage(e.message)}
     finally{setLoading(false)}
   }
@@ -124,12 +142,21 @@ function LeadCard({lead,rank,saved,onSave,onReject,onCopy}){
     {lead.photoName&&<a className="place-photo" href={lead.maps||'#'} target="_blank" rel="noreferrer"><img src={`/api/photo?name=${encodeURIComponent(lead.photoName)}`} alt={`${lead.name} Google Maps photo`} loading="lazy"/></a>}
     <div className="lead-body">
       <div className="lead-top">
-        <div><div className="tier">{lead.score>=82?'HOT':lead.score>=70?'GOOD':'REVIEW'}</div><h3>{lead.name}</h3></div>
+        <div><div className="tier">{lead.score>=82?'HOT':lead.score>=70?'GOOD':'REVIEW'}</div>{lead.hiddenGem&&<div className="gem-badge">💎 HIDDEN GEM</div>}<h3>{lead.name}</h3></div>
         <div className="score"><strong>{lead.score}</strong><span>/100</span></div>
       </div>
       <div className="meta"><span>⭐ {lead.rating} <em>({Number(lead.reviews).toLocaleString('en-IN')})</em></span><span>📍 {lead.area}</span><span>🍽 {lead.cuisine}</span></div>
       <p className="address">{lead.address}</p>
       <p className="reason">{lead.reason}</p>
+      {lead.researched&&<div className="research-box">
+        <div className="research-head"><span>AUTO RESEARCH</span><b className={`size-badge ${lead.sizeTone||''}`}>{lead.sizeClass}</b></div>
+        <div className="research-stats">
+          <span><strong>{lead.estimatedOutlets}</strong> outlet{lead.estimatedOutlets===1?'':'s'} detected</span>
+          <span>{lead.hiddenGem?'💎 Hidden gem fit':'📊 Broader footprint'}</span>
+          <span className={lead.researchDelta>=0?'delta-up':'delta-down'}>{lead.researchDelta>=0?'+':''}{lead.researchDelta} score</span>
+        </div>
+        <p>{lead.researchReason}</p>
+      </div>}
 
       <div className="contact">
         <div><span>DIRECT CONTACT</span><strong>{lead.phone||'No number returned by Google'}</strong></div>
