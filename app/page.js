@@ -60,8 +60,8 @@ export default function Home(){
         const researched=await Promise.all(top.map(async lead=>{
           try{
             const rr=await fetch('/api/research',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(lead)})
-            if(!rr.ok) return lead
             const research=await rr.json()
+            if(!rr.ok) return {...lead,researchError:research.error||'AI research unavailable'}
             return {...lead,...research}
           }catch{return lead}
         }))
@@ -149,14 +149,19 @@ function LeadCard({lead,rank,saved,onSave,onReject,onCopy}){
       <p className="address">{lead.address}</p>
       <p className="reason">{lead.reason}</p>
       {lead.researched&&<div className="research-box">
-        <div className="research-head"><span>AUTO RESEARCH</span><b className={`size-badge ${lead.sizeTone||''}`}>{lead.sizeClass}</b></div>
+        <div className="research-head"><span>GEMINI INDEPENDENT RESEARCH</span><b className={`size-badge ${lead.sizeTone||''}`}>{lead.sizeClass}</b></div>
         <div className="research-stats">
-          <span><strong>{lead.outletLabel||lead.estimatedOutlets}</strong> outlet{lead.estimatedOutlets===1?'':'s'} detected</span>
+          <span><strong>{lead.outletLabel||lead.estimatedOutlets}</strong> Kolkata outlet{lead.estimatedOutlets===1?'':'s'} supported</span>
           <span>{lead.hiddenGem?'💎 Hidden gem fit':`🔎 ${lead.outletConfidence||'unknown'} confidence`}</span>
+          <span>{lead.onSwiggy?'✓ Swiggy':'? Swiggy'}</span>
+          <span>{lead.onZomato?'✓ Zomato':'? Zomato'}</span>
           <span className={lead.researchDelta>=0?'delta-up':'delta-down'}>{lead.researchDelta>=0?'+':''}{lead.researchDelta} score</span>
         </div>
-        <p>{lead.researchReason}</p>
+        <p className="evidence-summary">{lead.evidenceSummary||lead.researchReason}</p>
+        {!!lead.outletLocations?.length&&<div className="outlet-list">{lead.outletLocations.map((x,i)=><span key={i}>{x}</span>)}</div>}
+        {!!lead.sources?.length&&<div className="research-sources">{lead.sources.map((src,i)=><a key={i} href={src.url} target="_blank" rel="noreferrer">{src.title||`Source ${i+1}`}</a>)}</div>}
       </div>}
+      {lead.researchError&&<div className="research-error">AI research unavailable · {lead.researchError}</div>}
 
       <div className="contact">
         <div><span>DIRECT CONTACT</span><strong>{lead.phone||'No number returned by Google'}</strong></div>
