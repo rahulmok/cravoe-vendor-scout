@@ -47,3 +47,21 @@
   .actions .primary{grid-column:auto}
   .saved-pill{max-width:120px;overflow:hidden;text-overflow:ellipsis}
 }
+
+.gem-badge{display:inline-block;margin-left:7px;background:#172a22;color:#a9eac0;border:1px solid #2e5a46;padding:4px 8px;border-radius:999px;font-size:9px;font-weight:900;letter-spacing:.08em;vertical-align:middle}
+.research-box{margin:14px 0 4px;padding:13px 14px;border-radius:12px;background:#121612;border:1px solid #253528}
+.research-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.research-head>span{font-size:9px;letter-spacing:.15em;color:#758074;font-weight:900}
+.size-badge{font-size:10px;padding:5px 8px;border-radius:999px;border:1px solid #3a3a3a;color:#bbb}
+.size-badge.great,.size-badge.good{background:#17301f;border-color:#2e5d3b;color:#a9e7ba}
+.size-badge.warning{background:#33260e;border-color:#6a4f18;color:#efc676}
+.size-badge.bad{background:#351919;border-color:#6a2e2e;color:#f0a1a1}
+.research-stats{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:#b6b8b2}
+.research-stats strong{color:#fff}
+.delta-up{color:#9be0aa}.delta-down{color:#f09a9a}
+.research-box p{margin:9px 0 0;font-size:11px;line-height:1.5;color:#7f877f}
+@media(max-width:760px){
+  .research-head{align-items:flex-start}
+  .research-stats{gap:8px 10px}
+  .gem-badge{margin-left:5px}
+}
