@@ -17,11 +17,21 @@ Import this repository and add the environment variable:
 Enable **Places API (New)** for the key.
 
 
-## Gemini independent research
+## Vertex Gemini independent research
 
-For the automatic restaurant research pass, add these Vercel environment variables:
+The automatic restaurant research pass uses the same keyless Vertex AI authentication pattern as the Cravoe Agent:
 
-- `GEMINI_API_KEY` — server-side Gemini API key
-- `GEMINI_MODEL` — optional; defaults through the app to current Flash fallbacks
+Vercel OIDC → Google Cloud Workload Identity Federation → service-account impersonation → Vertex AI Gemini.
 
-The research route uses Gemini with Google Search grounding to investigate each top lead's Kolkata outlet footprint, chain size, Swiggy/Zomato presence, hidden-gem fit, confidence, evidence summary, and grounded source links. Keep the key server-side; never expose it through `NEXT_PUBLIC_*`.
+Add these Vercel environment variables:
+
+- `GOOGLE_GENAI_USE_VERTEXAI=true`
+- `GOOGLE_CLOUD_PROJECT`
+- `GOOGLE_CLOUD_LOCATION=global`
+- `GCP_PROJECT_NUMBER`
+- `GCP_SERVICE_ACCOUNT_EMAIL`
+- `GCP_WORKLOAD_IDENTITY_POOL_ID`
+- `GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID`
+- optional `GEMINI_MODEL`
+
+No Gemini API key is required when Vertex/OIDC is configured. The research route uses Gemini with Google Search grounding to investigate each top lead's Kolkata outlet footprint, chain size, Swiggy/Zomato presence, hidden-gem fit, confidence, evidence summary, and grounded source links.
