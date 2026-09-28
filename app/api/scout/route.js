@@ -53,7 +53,7 @@ export async function POST(request){
       headers:{
         'Content-Type':'application/json',
         'X-Goog-Api-Key':apiKey,
-        'X-Goog-FieldMask':'places.id,places.displayName,places.formattedAddress,places.googleMapsUri,places.rating,places.userRatingCount,places.nationalPhoneNumber,places.internationalPhoneNumber,places.websiteUri,places.businessStatus,places.types'
+        'X-Goog-FieldMask':'places.id,places.displayName,places.formattedAddress,places.googleMapsUri,places.rating,places.userRatingCount,places.nationalPhoneNumber,places.internationalPhoneNumber,places.websiteUri,places.businessStatus,places.types,places.photos'
       },
       body:JSON.stringify({textQuery,minRating,languageCode:'en',regionCode:'IN',pageSize:20}),
       cache:'no-store'
@@ -71,7 +71,7 @@ export async function POST(request){
         return {
           id:p.id,name:p.displayName?.text||'Unnamed restaurant',rating:p.rating||0,reviews:p.userRatingCount||0,
           address:p.formattedAddress||'',phone:p.internationalPhoneNumber||p.nationalPhoneNumber||'',
-          website:p.websiteUri||'',maps:p.googleMapsUri||'',cuisine,area,score,reason:reason(p,score),status:'New'
+          website:p.websiteUri||'',maps:p.googleMapsUri||'',photoName:p.photos?.[0]?.name||'',cuisine,area,score,reason:reason(p,score),status:'New'
         }
       }).sort((a,b)=>b.score-a.score)
     return NextResponse.json({demo:false,query:textQuery,results})
