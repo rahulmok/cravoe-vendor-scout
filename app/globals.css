@@ -101,3 +101,11 @@
 .verifying-box{margin:14px 0 18px;padding:14px 16px;border:1px solid #2a3140;background:#121720;border-radius:12px;display:flex;flex-direction:column;gap:4px}
 .verifying-box strong{font-size:12px;color:#d9e2ff}
 .verifying-box span{font-size:11px;color:#8993aa}
+
+.zone-panel{display:grid;grid-template-columns:260px 1fr;gap:18px;align-items:start;margin:10px 0 4px;padding:16px 18px;background:#101010;border:1px solid #252525;border-radius:16px}
+.zone-copy>span{display:block;font-size:9px;letter-spacing:.15em;color:#777;font-weight:900}
+.zone-copy>strong{display:block;margin-top:5px;font-size:15px}
+.zone-copy p{margin:6px 0 0;color:#777;font-size:11px;line-height:1.5}
+.zone-chips{display:flex;flex-wrap:wrap;gap:7px}
+.zone-chips span{font-size:10px;color:#c7c7c1;background:#171717;border:1px solid #2a2a2a;border-radius:999px;padding:6px 8px}
+@media(max-width:760px){.zone-panel{grid-template-columns:1fr;padding:14px}.zone-chips{gap:6px}}
