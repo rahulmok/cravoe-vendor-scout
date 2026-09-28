@@ -3,7 +3,25 @@
 import { useEffect,useMemo,useState } from 'react'
 
 const CUISINES=['Bengali','Mughlai','North Indian','Bangladeshi']
-const AREAS=['Gariahat','Ballygunge','Dhakuria','Jodhpur Park','Lake Gardens','Tollygunge','New Alipore','Alipore','Bhawanipur','Park Circus','Entally','Park Street','Esplanade','Kalighat','Hazra','Golpark','Southern Avenue']
+const ZONES={
+  'South Kolkata':{
+    description:'Core South Kolkata — broad enough to scout properly, but excludes Behala, Joka, Thakurpukur and very deep south.',
+    areas:['Ballygunge','Gariahat','Golpark','Hindustan Park','Southern Avenue','Rashbehari','Dhakuria','Jodhpur Park','Lake Gardens','Prince Anwar Shah Road','Jadavpur','Garfa','Kasba','Kalighat','Hazra','Tollygunge','New Alipore','Alipore','Bhawanipur','Chetla']
+  },
+  'Central Kolkata':{
+    description:'Central business + dining belt.',
+    areas:['Park Street','Camac Street','Shakespeare Sarani','Chowringhee','Esplanade','New Market','Maidan','Minto Park','Theatre Road','Park Circus','Mullick Bazar','Entally','Sealdah','Bowbazar','AJC Bose Road']
+  },
+  'North Kolkata':{
+    description:'Traditional North Kolkata plus the practical northern belt, without pushing too far outside the city.',
+    areas:['Shyambazar','Hatibagan','Sovabazar','Bagbazar','Girish Park','Maniktala','Kankurgachi','Ultadanga','Belgachia','Paikpara','Sinthee','Dum Dum','Nagerbazar']
+  },
+  'East Kolkata / Salt Lake–New Town':{
+    description:'Salt Lake through New Town–Rajarhat and nearby eastern neighbourhoods.',
+    areas:['Salt Lake','Sector I','Sector II','Sector III','Sector V','New Town','Action Area I','Action Area II','Action Area III','Rajarhat','Chinar Park','Kaikhali','Baguiati','Lake Town']
+  }
+}
+const AREAS=Object.keys(ZONES)
 
 function digits(phone=''){
   return phone.replace(/\D/g,'')
@@ -25,7 +43,7 @@ function whatsappUrl(lead){
 
 export default function Home(){
   const [cuisine,setCuisine]=useState('Bengali')
-  const [area,setArea]=useState('Gariahat')
+  const [area,setArea]=useState('South Kolkata')
   const [minReviews,setMinReviews]=useState(80)
   const [results,setResults]=useState([])
   const [saved,setSaved]=useState([])
@@ -158,16 +176,21 @@ export default function Home(){
       <div>
         <div className="badge">🔥 FIND THE NEXT HIDDEN GEM</div>
         <h2>Stop hunting restaurants.<br/><span>Scout the right ones.</span></h2>
-        <p>Find 4★+ Bengali, Mughlai, North Indian and Bangladeshi restaurants across South & Central Kolkata, then rank them for Cravoe fit.</p>
+        <p>Scout verified hidden-gem restaurants across practical Kolkata zones, then rank them for Cravoe fit.</p>
       </div>
       <div className="hero-stat"><span>TARGET</span><strong>10</strong><small>quality vendors</small></div>
     </section>
 
     <section className="search-panel">
       <label><span>Cuisine</span><select value={cuisine} onChange={e=>setCuisine(e.target.value)}>{CUISINES.map(x=><option key={x}>{x}</option>)}</select></label>
-      <label><span>Area</span><select value={area} onChange={e=>setArea(e.target.value)}>{AREAS.map(x=><option key={x}>{x}</option>)}</select></label>
+      <label><span>Zone</span><select value={area} onChange={e=>setArea(e.target.value)}>{AREAS.map(x=><option key={x}>{x}</option>)}</select></label>
       <label><span>Min reviews</span><select value={minReviews} onChange={e=>setMinReviews(Number(e.target.value))}><option value="0">Any</option><option value="50">50+</option><option value="80">80+</option><option value="150">150+</option><option value="300">300+</option></select></label>
       <button className="scout-btn" onClick={scout} disabled={loading}>{loading?'Scouting…':'Scout Restaurants'}</button>
+    </section>
+
+    <section className="zone-panel">
+      <div className="zone-copy"><span>AREAS INCLUDED</span><strong>{area}</strong><p>{ZONES[area]?.description}</p></div>
+      <div className="zone-chips">{(ZONES[area]?.areas||[]).map(x=><span key={x}>{x}</span>)}</div>
     </section>
 
     <div className="status-row">
@@ -178,7 +201,7 @@ export default function Home(){
     <section className="content-grid">
       <div>
         <div className="section-title"><span>CANDIDATES</span><h3>{visible.length?`${visible.length} matches`:'Ready to scout'}</h3></div>
-        {!visible.length&&!loading&&!stillVerifying.length&&<div className="empty"><strong>No verified Cravoe-fit leads yet</strong><p>Try another cuisine/area or lower the review threshold.</p></div>}
+        {!visible.length&&!loading&&!stillVerifying.length&&<div className="empty"><strong>No verified Cravoe-fit leads yet</strong><p>Try another cuisine/zone or lower the review threshold.</p></div>}
         {!!stillVerifying.length&&<div className="verifying-box"><strong>Verifying {stillVerifying.length} more candidate{stillVerifying.length===1?'':'s'}…</strong><span>They will not appear as leads until brand size and Cravoe fit are checked.</span></div>}
         <div className="cards">
           {visible.map((lead,i)=><LeadCard key={lead.id} lead={lead} rank={i+1} saved={saved.some(s=>s.id===lead.id)} onSave={saveLead} onReject={rejectLead} onCopy={copyPhone}/>)}
