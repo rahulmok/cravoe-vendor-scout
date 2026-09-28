@@ -151,8 +151,8 @@ function LeadCard({lead,rank,saved,onSave,onReject,onCopy}){
       {lead.researched&&<div className="research-box">
         <div className="research-head"><span>AUTO RESEARCH</span><b className={`size-badge ${lead.sizeTone||''}`}>{lead.sizeClass}</b></div>
         <div className="research-stats">
-          <span><strong>{lead.estimatedOutlets}</strong> outlet{lead.estimatedOutlets===1?'':'s'} detected</span>
-          <span>{lead.hiddenGem?'💎 Hidden gem fit':'📊 Broader footprint'}</span>
+          <span><strong>{lead.outletLabel||lead.estimatedOutlets}</strong> outlet{lead.estimatedOutlets===1?'':'s'} detected</span>
+          <span>{lead.hiddenGem?'💎 Hidden gem fit':`🔎 ${lead.outletConfidence||'unknown'} confidence`}</span>
           <span className={lead.researchDelta>=0?'delta-up':'delta-down'}>{lead.researchDelta>=0?'+':''}{lead.researchDelta} score</span>
         </div>
         <p>{lead.researchReason}</p>
