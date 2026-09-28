@@ -1,159 +1,226 @@
 import { NextResponse } from 'next/server'
 
-const AREAS=[
-  'Gariahat','Ballygunge','Dhakuria','Jodhpur Park','Lake Gardens','Tollygunge',
-  'New Alipore','Alipore','Bhawanipur','Park Circus','Entally','Park Street',
-  'Esplanade','Kalighat','Hazra','Golpark','Southern Avenue','Salt Lake','New Town',
-  'Behala','Garia','Kasba','Ruby','Sealdah','Shyambazar'
-]
+const MODEL_CANDIDATES=[
+  process.env.GEMINI_MODEL,
+  'gemini-3.8-flash',
+  'gemini-3.6-flash',
+  'gemini-2.5-flash'
+].filter((v,i,a)=>v&&a.indexOf(v)===i)
 
-function normalizeName(value=''){
-  return value
-    .toLowerCase()
-    .replace(/&/g,' and ')
-    .replace(/[^a-z0-9\s]/g,' ')
-    .replace(/\b(restaurant|restaurants|restro|cafe|kitchen|foods|food|kolkata|calcutta|branch|outlet)\b/g,' ')
-    .replace(/\s+/g,' ')
+function cleanJson(text=''){
+  const stripped=text
+    .replace(/```json/gi,'')
+    .replace(/```/g,'')
     .trim()
+  const start=stripped.indexOf('{')
+  const end=stripped.lastIndexOf('}')
+  if(start<0||end<start) throw new Error('Gemini did not return valid JSON')
+  return JSON.parse(stripped.slice(start,end+1))
 }
 
-function similarity(a,b){
-  const A=new Set(normalizeName(a).split(' ').filter(Boolean))
-  const B=new Set(normalizeName(b).split(' ').filter(Boolean))
-  if(!A.size||!B.size) return 0
-  let common=0
-  for(const token of A) if(B.has(token)) common++
-  return common/Math.max(A.size,B.size)
+function normalizeSize(value=''){
+  const v=String(value).toLowerCase()
+  if(v.includes('large')) return 'Large chain'
+  if(v.includes('growing')||v.includes('medium')) return 'Growing chain'
+  if(v.includes('small')) return 'Small group'
+  if(v.includes('independent')||v.includes('single')) return 'Independent'
+  return 'Uncertain'
 }
 
-async function placesSearch(apiKey,textQuery){
-  const response=await fetch('https://places.googleapis.com/v1/places:searchText',{
+function tone(size){
+  if(size==='Independent') return 'great'
+  if(size==='Small group') return 'good'
+  if(size==='Growing chain') return 'warning'
+  if(size==='Large chain') return 'bad'
+  return 'warning'
+}
+
+function calcDelta({sizeClass,hiddenGem,tooBigForCravoe,confidence,onSwiggy,onZomato}){
+  let delta=0
+  if(sizeClass==='Independent') delta+=7
+  if(sizeClass==='Small group') delta+=3
+  if(sizeClass==='Growing chain') delta-=8
+  if(sizeClass==='Large chain') delta-=18
+  if(hiddenGem) delta+=8
+  if(tooBigForCravoe) delta-=10
+  if(onSwiggy) delta+=1
+  if(onZomato) delta+=1
+  if(confidence==='low') delta=Math.round(delta*.5)
+  return Math.max(-30,Math.min(20,delta))
+}
+
+async function callGemini(apiKey,model,prompt){
+  const response=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{
     method:'POST',
     headers:{
       'Content-Type':'application/json',
-      'X-Goog-Api-Key':apiKey,
-      'X-Goog-FieldMask':'places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.businessStatus'
+      'x-goog-api-key':apiKey
     },
     body:JSON.stringify({
-      textQuery,
-      languageCode:'en',
-      regionCode:'IN',
-      pageSize:20
+      contents:[{role:'user',parts:[{text:prompt}]}],
+      tools:[{google_search:{}}],
+      generationConfig:{
+        temperature:0.1,
+        maxOutputTokens:3000
+      }
     }),
     cache:'no-store'
   })
-  if(!response.ok) return []
-  const data=await response.json()
-  return data.places||[]
-}
-
-function classify(outlets,confidence){
-  if(outlets>=7) return {sizeClass:'Large chain',sizeTone:'bad',sizePenalty:18,sizeBonus:0}
-  if(outlets>=4) return {sizeClass:'Growing chain',sizeTone:'warning',sizePenalty:8,sizeBonus:0}
-  if(outlets>=2) return {sizeClass:'Small group',sizeTone:'good',sizePenalty:0,sizeBonus:4}
-  if(confidence==='high') return {sizeClass:'Likely independent',sizeTone:'great',sizePenalty:0,sizeBonus:8}
-  return {sizeClass:'Outlet count uncertain',sizeTone:'warning',sizePenalty:0,sizeBonus:0}
+  const raw=await response.text()
+  if(!response.ok) return {ok:false,status:response.status,raw}
+  const data=JSON.parse(raw)
+  return {ok:true,data}
 }
 
 export async function POST(request){
   try{
     const lead=await request.json()
-    const apiKey=process.env.GOOGLE_PLACES_API_KEY
-    if(!apiKey) return NextResponse.json({error:'Missing Google Places API key'},{status:500})
-
-    const baseQueries=[
-      `${lead.name} Kolkata West Bengal India`,
-      `${lead.name} branches Kolkata`,
-      `${lead.name} outlets Kolkata`
-    ]
-
-    const areaQueries=AREAS.map(area=>`${lead.name} ${area} Kolkata`)
-    const queries=[...baseQueries,...areaQueries]
-
-    const batches=[]
-    for(let i=0;i<queries.length;i+=6){
-      const chunk=queries.slice(i,i+6)
-      const result=await Promise.all(chunk.map(q=>placesSearch(apiKey,q)))
-      batches.push(...result)
+    const apiKey=process.env.GEMINI_API_KEY
+    if(!apiKey){
+      return NextResponse.json({
+        error:'Gemini research is not configured. Add GEMINI_API_KEY in Vercel.'
+      },{status:503})
     }
 
-    const all=batches.flat()
-      .filter(p=>p.businessStatus!=='CLOSED_PERMANENTLY')
-      .filter(p=>(p.formattedAddress||'').toLowerCase().includes('kolkata'))
-      .filter(p=>similarity(lead.name,p.displayName?.text||'')>=0.5)
+    const prompt=`
+You are the research analyst for Cravoe, a selective Kolkata food-discovery and delivery startup.
 
-    const byId=new Map()
-    for(const p of all){
-      if(p.id) byId.set(p.id,p)
-    }
-    const matches=[...byId.values()]
-    const detectedOutlets=Math.max(1,matches.length)
+Independently research this restaurant using Google Search:
+Restaurant: "${lead.name}"
+Known listing address: "${lead.address||'Unknown'}"
+Area from discovery search: "${lead.area||'Kolkata'}"
+Cuisine: "${lead.cuisine||'Unknown'}"
+Google rating seen by our discovery system: ${lead.rating||'Unknown'}
+Google review count seen by our discovery system: ${lead.reviews||'Unknown'}
 
-    const matchedAreas=new Set()
-    for(const p of matches){
-      const addr=(p.formattedAddress||'').toLowerCase()
-      for(const area of AREAS){
-        if(addr.includes(area.toLowerCase())) matchedAreas.add(area)
+Your task is to establish the restaurant BRAND'S CURRENT ACTIVE FOOTPRINT across Kolkata / Greater Kolkata, not merely within the selected area.
+
+Research carefully across:
+- official website and official outlet/location pages
+- Google/Maps-related search results
+- official Instagram and Facebook
+- Swiggy and Zomato outlet/listing pages
+- credible articles/directories only as secondary evidence
+
+Rules:
+1. Do not assume one search result equals one outlet.
+2. Deduplicate the same outlet appearing on multiple websites.
+3. Count only locations that appear currently active.
+4. Do not count delivery-only duplicate listings unless they are genuinely separate outlets.
+5. If multiple restaurants have similar names, use address/cuisine/context to avoid mixing brands.
+6. Never invent an exact outlet count. If evidence is incomplete, use a conservative minimum and lower confidence.
+7. "Independent" should only be used when there is strong evidence that this is genuinely a one-outlet business. Otherwise use "Uncertain".
+8. Cravoe prefers highly rated, quality-focused, lesser-known restaurants and small local groups, not large established chains.
+9. Check whether the brand appears to be on Swiggy and Zomato.
+10. Return ONLY one JSON object and no markdown.
+
+Use this exact JSON shape:
+{
+  "restaurant_name": "string",
+  "active_kolkata_outlets_min": 1,
+  "outlet_locations": ["Area / locality - short evidence label"],
+  "size_class": "Independent | Small group | Growing chain | Large chain | Uncertain",
+  "hidden_gem": true,
+  "too_big_for_cravoe": false,
+  "confidence": "high | medium | low",
+  "on_swiggy": true,
+  "on_zomato": true,
+  "evidence_summary": "2-4 concise sentences explaining the conclusion and any uncertainty"
+}
+
+Size guide:
+- Independent: exactly 1 strongly supported active outlet
+- Small group: 2-3 active outlets
+- Growing chain: 4-7 active outlets
+- Large chain: 8+ active outlets
+- Uncertain: evidence is too incomplete/conflicting to safely classify
+`
+
+    let gemini=null
+    let modelUsed=''
+    let lastError=''
+
+    for(const model of MODEL_CANDIDATES){
+      const attempt=await callGemini(apiKey,model,prompt)
+      if(attempt.ok){
+        gemini=attempt.data
+        modelUsed=model
+        break
       }
+      lastError=attempt.raw||`Gemini HTTP ${attempt.status}`
+      if(![400,404].includes(attempt.status)) break
     }
 
-    const confidence=
-      detectedOutlets>=4 ? 'high' :
-      detectedOutlets>=2 ? 'medium' :
-      matchedAreas.size>=1 && all.length>=1 ? 'medium' :
-      'low'
+    if(!gemini){
+      return NextResponse.json({error:`Gemini research failed: ${lastError.slice(0,600)}`},{status:502})
+    }
 
-    const size=classify(detectedOutlets,confidence)
+    const candidate=gemini.candidates?.[0]
+    const text=(candidate?.content?.parts||[]).map(p=>p.text||'').join('\n')
+    const parsed=cleanJson(text)
 
-    const reviews=Number(lead.reviews||0)
-    const rating=Number(lead.rating||0)
-    let researchDelta=size.sizeBonus-size.sizePenalty
+    let sizeClass=normalizeSize(parsed.size_class)
+    const confidence=['high','medium','low'].includes(String(parsed.confidence).toLowerCase())
+      ? String(parsed.confidence).toLowerCase()
+      : 'low'
 
-    if(rating>=4.5) researchDelta+=4
-    else if(rating>=4.3) researchDelta+=2
+    const estimatedOutlets=Math.max(1,Number(parsed.active_kolkata_outlets_min)||1)
+    if(sizeClass==='Independent'&&(estimatedOutlets!==1||confidence!=='high')) sizeClass='Uncertain'
 
-    if(reviews>=120&&reviews<=2500) researchDelta+=7
-    else if(reviews>5000&&reviews<=12000) researchDelta-=6
-    else if(reviews>12000) researchDelta-=12
-    else if(reviews<50) researchDelta-=3
+    const hiddenGem=Boolean(parsed.hidden_gem)
+    const tooBigForCravoe=Boolean(parsed.too_big_for_cravoe)
+    const onSwiggy=Boolean(parsed.on_swiggy)
+    const onZomato=Boolean(parsed.on_zomato)
 
-    if(lead.phone) researchDelta+=2
-
-    const hiddenGem=
-      detectedOutlets<=3 &&
-      confidence!=='low' &&
-      rating>=4.2 &&
-      reviews>=100 &&
-      reviews<=3500
-
-    if(hiddenGem) researchDelta+=5
-
+    const researchDelta=calcDelta({
+      sizeClass,hiddenGem,tooBigForCravoe,confidence,onSwiggy,onZomato
+    })
     const researchedScore=Math.max(0,Math.min(100,Math.round(Number(lead.score||0)+researchDelta)))
 
-    const researchBits=[]
-    researchBits.push(`at least ${detectedOutlets} Kolkata outlet${detectedOutlets===1?'':'s'} detected`)
-    researchBits.push(`${confidence} confidence`)
-    researchBits.push(size.sizeClass)
-    if(hiddenGem) researchBits.push('strong hidden-gem profile')
-    if(reviews>5000) researchBits.push('large review footprint')
-    if(size.sizePenalty) researchBits.push('size penalty applied')
-    else if(confidence==='low') researchBits.push('not enough evidence to call it independent')
-    else researchBits.push('size fits Cravoe better')
+    const grounding=candidate?.groundingMetadata||{}
+    const sources=[]
+    for(const chunk of grounding.groundingChunks||[]){
+      const web=chunk?.web
+      if(web?.uri&&!sources.some(s=>s.url===web.uri)){
+        sources.push({title:web.title||'Source',url:web.uri})
+      }
+      if(sources.length>=6) break
+    }
+
+    const outletLocations=Array.isArray(parsed.outlet_locations)
+      ? parsed.outlet_locations.slice(0,12).map(String)
+      : []
+
+    const researchReason=[
+      `Gemini web research: at least ${estimatedOutlets} Kolkata outlet${estimatedOutlets===1?'':'s'} supported`,
+      `${confidence} confidence`,
+      sizeClass,
+      hiddenGem?'hidden-gem profile':'broader/uncertain footprint',
+      tooBigForCravoe?'too large for Cravoe target':'size not automatically disqualifying'
+    ].join(' • ')
 
     return NextResponse.json({
       researched:true,
-      estimatedOutlets:detectedOutlets,
-      outletLabel:`At least ${detectedOutlets}`,
+      researchProvider:'Gemini + Google Search',
+      modelUsed,
+      estimatedOutlets,
+      outletLabel:`At least ${estimatedOutlets}`,
+      outletLocations,
       outletConfidence:confidence,
-      sizeClass:size.sizeClass,
-      sizeTone:size.sizeTone,
+      sizeClass,
+      sizeTone:tone(sizeClass),
       hiddenGem,
+      tooBigForCravoe,
+      onSwiggy,
+      onZomato,
+      evidenceSummary:String(parsed.evidence_summary||'Research completed.'),
+      sources,
       originalScore:Number(lead.score||0),
       score:researchedScore,
       researchDelta,
-      researchReason:researchBits.join(' • ')
+      researchReason
     })
   }catch(error){
-    return NextResponse.json({error:error.message||'Research failed'},{status:500})
+    return NextResponse.json({error:error.message||'Gemini research failed'},{status:500})
   }
 }
