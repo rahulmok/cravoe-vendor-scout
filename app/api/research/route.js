@@ -1,4 +1,7 @@
 import { NextResponse } from 'next/server'
+import { GoogleGenAI } from '@google/genai'
+import { ExternalAccountClient } from 'google-auth-library'
+import { getVercelOidcToken } from '@vercel/oidc'
 
 const MODEL_CANDIDATES=[
   process.env.GEMINI_MODEL,
@@ -6,6 +9,69 @@ const MODEL_CANDIDATES=[
   'gemini-3.6-flash',
   'gemini-2.5-flash'
 ].filter((v,i,a)=>v&&a.indexOf(v)===i)
+
+let ai=null
+
+function vertexConfigured(){
+  return process.env.GOOGLE_GENAI_USE_VERTEXAI==='true' && !!process.env.GOOGLE_CLOUD_PROJECT
+}
+
+function vertexClient(){
+  if(ai) return ai
+  if(!vertexConfigured()) throw new Error('Vertex AI is not configured')
+
+  const E=process.env
+  let credentials
+  try{
+    credentials=E.GOOGLE_SERVICE_ACCOUNT_JSON ? JSON.parse(E.GOOGLE_SERVICE_ACCOUNT_JSON) : undefined
+  }catch{
+    credentials=undefined
+  }
+
+  const oidcFields=[
+    E.GCP_PROJECT_NUMBER,
+    E.GCP_SERVICE_ACCOUNT_EMAIL,
+    E.GCP_WORKLOAD_IDENTITY_POOL_ID,
+    E.GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID
+  ]
+
+  if(oidcFields.some(Boolean) && !oidcFields.every(Boolean)){
+    throw new Error('Incomplete Vertex workload identity configuration')
+  }
+
+  const oidc=oidcFields.every(Boolean)
+    ? ExternalAccountClient.fromJSON({
+        type:'external_account',
+        audience:`//iam.googleapis.com/projects/${E.GCP_PROJECT_NUMBER}/locations/global/workloadIdentityPools/${E.GCP_WORKLOAD_IDENTITY_POOL_ID}/providers/${E.GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID}`,
+        subject_token_type:'urn:ietf:params:oauth:token-type:jwt',
+        token_url:'https://sts.googleapis.com/v1/token',
+        service_account_impersonation_url:`https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${E.GCP_SERVICE_ACCOUNT_EMAIL}:generateAccessToken`,
+        subject_token_supplier:{
+          getSubjectToken:()=>getVercelOidcToken()
+        }
+      })
+    : null
+
+  if(!oidc && !credentials){
+    throw new Error('Vertex needs Vercel Workload Identity or explicit service-account credentials')
+  }
+
+  ai=new GoogleGenAI({
+    vertexai:true,
+    project:E.GOOGLE_CLOUD_PROJECT,
+    location:E.GOOGLE_CLOUD_LOCATION||'global',
+    httpOptions:{apiVersion:'v1'},
+    ...(oidc
+      ? {googleAuthOptions:{
+          authClient:oidc,
+          projectId:E.GOOGLE_CLOUD_PROJECT,
+          scopes:['https://www.googleapis.com/auth/cloud-platform']
+        }}
+      : {googleAuthOptions:{credentials}})
+  })
+
+  return ai
+}
 
 function cleanJson(text=''){
   const stripped=text
@@ -49,36 +115,29 @@ function calcDelta({sizeClass,hiddenGem,tooBigForCravoe,confidence,onSwiggy,onZo
   return Math.max(-30,Math.min(20,delta))
 }
 
-async function callGemini(apiKey,model,prompt){
-  const response=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{
-    method:'POST',
-    headers:{
-      'Content-Type':'application/json',
-      'x-goog-api-key':apiKey
-    },
-    body:JSON.stringify({
-      contents:[{role:'user',parts:[{text:prompt}]}],
-      tools:[{google_search:{}}],
-      generationConfig:{
-        temperature:0.1,
-        maxOutputTokens:3000
-      }
-    }),
-    cache:'no-store'
+async function callGemini(model,prompt){
+  const res=await vertexClient().models.generateContent({
+    model,
+    contents:[{
+      role:'user',
+      parts:[{text:prompt}]
+    }],
+    config:{
+      temperature:0.1,
+      maxOutputTokens:3000,
+      tools:[{googleSearch:{}}]
+    }
   })
-  const raw=await response.text()
-  if(!response.ok) return {ok:false,status:response.status,raw}
-  const data=JSON.parse(raw)
-  return {ok:true,data}
+  return res
 }
 
 export async function POST(request){
   try{
     const lead=await request.json()
-    const apiKey=process.env.GEMINI_API_KEY
-    if(!apiKey){
+
+    if(!vertexConfigured()){
       return NextResponse.json({
-        error:'Gemini research is not configured. Add GEMINI_API_KEY in Vercel.'
+        error:'Vertex research is not configured. Add the same Vertex/OIDC environment variables used by Cravoe Agent.'
       },{status:503})
     }
 
@@ -141,22 +200,23 @@ Size guide:
     let lastError=''
 
     for(const model of MODEL_CANDIDATES){
-      const attempt=await callGemini(apiKey,model,prompt)
-      if(attempt.ok){
-        gemini=attempt.data
+      try{
+        gemini=await callGemini(model,prompt)
         modelUsed=model
         break
+      }catch(error){
+        lastError=String(error?.message||error)
+        const msg=lastError.toLowerCase()
+        const canTryNext=msg.includes('not found')||msg.includes('404')||msg.includes('model')
+        if(!canTryNext) break
       }
-      lastError=attempt.raw||`Gemini HTTP ${attempt.status}`
-      if(![400,404].includes(attempt.status)) break
     }
 
     if(!gemini){
-      return NextResponse.json({error:`Gemini research failed: ${lastError.slice(0,600)}`},{status:502})
+      return NextResponse.json({error:`Vertex Gemini research failed: ${lastError.slice(0,600)}`},{status:502})
     }
 
-    const candidate=gemini.candidates?.[0]
-    const text=(candidate?.content?.parts||[]).map(p=>p.text||'').join('\n')
+    const text=gemini.text||''
     const parsed=cleanJson(text)
 
     let sizeClass=normalizeSize(parsed.size_class)
@@ -177,7 +237,7 @@ Size guide:
     })
     const researchedScore=Math.max(0,Math.min(100,Math.round(Number(lead.score||0)+researchDelta)))
 
-    const grounding=candidate?.groundingMetadata||{}
+    const grounding=gemini.candidates?.[0]?.groundingMetadata||{}
     const sources=[]
     for(const chunk of grounding.groundingChunks||[]){
       const web=chunk?.web
@@ -192,7 +252,7 @@ Size guide:
       : []
 
     const researchReason=[
-      `Gemini web research: at least ${estimatedOutlets} Kolkata outlet${estimatedOutlets===1?'':'s'} supported`,
+      `Vertex Gemini research: at least ${estimatedOutlets} Kolkata outlet${estimatedOutlets===1?'':'s'} supported`,
       `${confidence} confidence`,
       sizeClass,
       hiddenGem?'hidden-gem profile':'broader/uncertain footprint',
@@ -201,7 +261,7 @@ Size guide:
 
     return NextResponse.json({
       researched:true,
-      researchProvider:'Gemini + Google Search',
+      researchProvider:'Vertex Gemini + Google Search',
       modelUsed,
       estimatedOutlets,
       outletLabel:`At least ${estimatedOutlets}`,
@@ -221,6 +281,6 @@ Size guide:
       researchReason
     })
   }catch(error){
-    return NextResponse.json({error:error.message||'Gemini research failed'},{status:500})
+    return NextResponse.json({error:error.message||'Vertex Gemini research failed'},{status:500})
   }
 }
