@@ -74,26 +74,33 @@ export default function Home(){
         })
         setResults(screened)
 
-        // Stage 2: deep Gemini research ONLY the best non-chain candidates.
-        // Researching 4 in parallel is dramatically faster than grounding 10 restaurants.
-        const deepTargets=screened.filter(x=>!x.automaticReject).slice(0,4)
-        setMessage(`Brand screen done · deep-checking ${deepTargets.length} strongest hidden-gem candidates…`)
-        const researched=await Promise.all(deepTargets.map(async lead=>{
-          try{
-            const rr=await fetch('/api/research',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(lead)})
-            const research=await rr.json()
-            if(!rr.ok) return {...lead,researchError:research.error||'AI research unavailable'}
-            return {...lead,...research}
-          }catch{return lead}
-        }))
-        const researchMap=new Map(researched.map(x=>[x.id,x]))
-        screened=screened.map(x=>researchMap.get(x.id)||x).sort((a,b)=>{
+        // Stage 2: ONE grounded Gemini batch pass over the strongest candidates.
+        // This is both faster and better: the model compares brands against Cravoe's target in context.
+        const deepTargets=screened.filter(x=>!x.automaticReject).slice(0,12)
+        setMessage(`Brand screen done · AI-checking ${deepTargets.length} candidates together…`)
+        let batchRows=[]
+        let batchSources=[]
+        try{
+          const rr=await fetch('/api/research-batch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({leads:deepTargets})})
+          const research=await rr.json()
+          if(rr.ok){
+            batchRows=research.results||[]
+            batchSources=research.sources||[]
+          }else{
+            setMessage(`Brand screen done · AI batch research unavailable: ${research.error||'unknown error'}`)
+          }
+        }catch{}
+        const researchMap=new Map(batchRows.map(x=>[x.id,x]))
+        screened=screened.map(x=>{
+          const research=researchMap.get(x.id)
+          return research?{...x,...research,sources:batchSources}:x
+        }).sort((a,b)=>{
           if(Boolean(a.tooBigForCravoe||a.automaticReject)!==Boolean(b.tooBigForCravoe||b.automaticReject)) return (a.tooBigForCravoe||a.automaticReject)?1:-1
           return Number(b.score||0)-Number(a.score||0)
         })
         setResults(screened)
         const filtered=screened.filter(x=>x.automaticReject||x.tooBigForCravoe).length
-        setMessage(`${baseResults.length} found · ${filtered} obvious big/multi-outlet brands flagged · ${researched.length} best leads deeply researched`)
+        setMessage(`${baseResults.length} found · ${filtered} big/established brands rejected · ${batchRows.length} candidates AI-verified`)
       }
     }catch(e){setMessage(e.message)}
     finally{setLoading(false)}
@@ -178,8 +185,8 @@ function LeadCard({lead,rank,saved,onSave,onReject,onCopy}){
         <span>{lead.brandScanReason}</span>
         {!!lead.brandOutlets?.length&&<small>{lead.brandOutlets.slice(0,5).map(x=>x.address||x.name).join(' · ')}</small>}
       </div>}
-      {lead.researched&&<div className="research-box">
-        <div className="research-head"><span>GEMINI INDEPENDENT RESEARCH</span><div className="research-head-badges">{lead.fitStatus&&<b className={`fit-badge ${lead.fitStatus==='AUTO REJECT'?'bad':lead.fitStatus==='STRONG FIT'?'great':'warning'}`}>{lead.fitStatus}</b>}<b className={`size-badge ${lead.sizeTone||''}`}>{lead.sizeClass}</b></div></div>
+      {lead.researched&&<div className={`research-box ${lead.fitStatus==='REJECT'?'research-reject':''}`}>
+        <div className="research-head"><span>GEMINI INDEPENDENT RESEARCH</span><div className="research-head-badges">{lead.fitStatus&&<b className={`fit-badge ${lead.fitStatus==='REJECT'?'bad':lead.fitStatus==='STRONG_FIT'?'great':lead.fitStatus==='POSSIBLE_FIT'?'good':'warning'}`}>{lead.fitStatus.replace('_',' ')}</b>}<b className={`size-badge ${lead.sizeTone||''}`}>{lead.sizeClass}</b></div></div>
         <div className="research-stats">
           <span><strong>{lead.outletLabel||lead.estimatedOutlets}</strong> Kolkata outlet{lead.estimatedOutlets===1?'':'s'} supported</span>
           <span>{lead.hiddenGem?'💎 Hidden gem fit':`🔎 ${lead.outletConfidence||'unknown'} confidence`}</span>
@@ -187,7 +194,7 @@ function LeadCard({lead,rank,saved,onSave,onReject,onCopy}){
           <span>{lead.onZomato?'✓ Zomato':'? Zomato'}</span>
           <span className={lead.researchDelta>=0?'delta-up':'delta-down'}>{lead.researchDelta>=0?'+':''}{lead.researchDelta} score</span>
         </div>
-        <p className="evidence-summary">{lead.evidenceSummary||lead.researchReason}</p>
+        <p className="fit-reason">{lead.researchReason}</p><p className="evidence-summary">{lead.evidenceSummary}</p>
         {!!lead.outletLocations?.length&&<div className="outlet-list">{lead.outletLocations.map((x,i)=><span key={i}>{x}</span>)}</div>}
         {!!lead.sources?.length&&<div className="research-sources">{lead.sources.map((src,i)=><a key={i} href={src.url} target="_blank" rel="noreferrer">{src.title||`Source ${i+1}`}</a>)}</div>}
       </div>}
