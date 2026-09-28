@@ -7,7 +7,32 @@ const CUISINE_TERMS = {
   Bangladeshi: ['bangladeshi','dhaka','bangla','bhorta','ilish','hilsa']
 }
 
-function scorePlace(place,cuisine,area){
+const ZONES={
+  'South Kolkata':{
+    areas:['Ballygunge','Gariahat','Golpark','Hindustan Park','Southern Avenue','Rashbehari','Dhakuria','Jodhpur Park','Lake Gardens','Prince Anwar Shah Road','Jadavpur','Garfa','Kasba','Kalighat','Hazra','Tollygunge','New Alipore','Alipore','Bhawanipur','Chetla'],
+    seeds:['Gariahat','Ballygunge','Jadavpur','Kasba','Tollygunge','New Alipore']
+  },
+  'Central Kolkata':{
+    areas:['Park Street','Camac Street','Shakespeare Sarani','Chowringhee','Esplanade','New Market','Maidan','Minto Park','Theatre Road','Park Circus','Mullick Bazar','Entally','Sealdah','Bowbazar','AJC Bose Road'],
+    seeds:['Park Street','Esplanade','Park Circus','Minto Park','Sealdah']
+  },
+  'North Kolkata':{
+    areas:['Shyambazar','Hatibagan','Sovabazar','Bagbazar','Girish Park','Maniktala','Kankurgachi','Ultadanga','Belgachia','Paikpara','Sinthee','Dum Dum','Nagerbazar'],
+    seeds:['Shyambazar','Hatibagan','Maniktala','Kankurgachi','Dum Dum']
+  },
+  'East Kolkata / Salt Lake–New Town':{
+    areas:['Salt Lake','Sector I','Sector II','Sector III','Sector V','New Town','Action Area I','Action Area II','Action Area III','Rajarhat','Chinar Park','Kaikhali','Baguiati','Lake Town'],
+    seeds:['Salt Lake','Sector V','New Town','Rajarhat','Chinar Park','Lake Town']
+  }
+}
+
+function zoneHit(text,zone){
+  const areas=ZONES[zone]?.areas||[]
+  const t=text.toLowerCase()
+  return areas.some(x=>t.includes(x.toLowerCase()))
+}
+
+function scorePlace(place,cuisine,zone){
   const rating=Number(place.rating||0), reviews=Number(place.userRatingCount||0)
   const text=`${place.displayName?.text||''} ${place.formattedAddress||''} ${(place.types||[]).join(' ')}`.toLowerCase()
   const ratingScore=Math.max(0,Math.min(28,(rating-3.8)*35))
@@ -20,7 +45,7 @@ function scorePlace(place,cuisine,area){
   if(reviews>=3500) reviewScore=10
   if(reviews>=7000) reviewScore=3
   const cuisineScore=(CUISINE_TERMS[cuisine]||[]).some(t=>text.includes(t))?20:14
-  const areaScore=text.includes(area.toLowerCase())?10:7
+  const areaScore=zoneHit(text,zone)?10:5
   const contactScore=place.nationalPhoneNumber?10:3
   const webScore=place.websiteUri?5:2
   let sizeScore=15
@@ -68,22 +93,27 @@ async function placesSearch(apiKey,textQuery,minRating){
 export async function POST(request){
   try{
     const body=await request.json()
-    const cuisine=body.cuisine||'Bengali', area=body.area||'Gariahat', minRating=Number(body.minRating||4)
+    const cuisine=body.cuisine||'Bengali'
+    const area=ZONES[body.area]?body.area:'South Kolkata'
+    const minRating=Number(body.minRating||4)
     const apiKey=process.env.GOOGLE_PLACES_API_KEY
     if(!apiKey) return NextResponse.json({demo:true,message:'Add GOOGLE_PLACES_API_KEY in Vercel for live data.',results:demo(cuisine,area)})
 
+    const zone=ZONES[area]
     const queries=[
-      `${cuisine} restaurants in ${area}, Kolkata, West Bengal, India`,
+      `${cuisine} restaurants in ${area}, Kolkata`,
       `best local ${cuisine} restaurant in ${area}, Kolkata`,
-      `hidden gem ${cuisine} restaurant near ${area}, Kolkata`,
-      `family restaurant ${cuisine} in ${area}, Kolkata`
+      ...zone.seeds.map(seed=>`${cuisine} restaurant in ${seed}, Kolkata`)
     ]
+
     const settled=await Promise.allSettled(queries.map(q=>placesSearch(apiKey,q,minRating)))
     const merged=new Map()
     for(const r of settled){
       if(r.status!=='fulfilled') continue
       for(const p of r.value){
         if(p.businessStatus==='CLOSED_PERMANENTLY'||Number(p.rating||0)<minRating) continue
+        const address=String(p.formattedAddress||'')
+        if(!zoneHit(address,area)) continue
         if(!merged.has(p.id)) merged.set(p.id,p)
       }
     }
@@ -96,9 +126,9 @@ export async function POST(request){
         website:p.websiteUri||'',maps:p.googleMapsUri||'',photoName:p.photos?.[0]?.name||'',cuisine,area,score,
         reason:reason(p,score),status:'New'
       }
-    }).sort((a,b)=>b.score-a.score).slice(0,30)
+    }).sort((a,b)=>b.score-a.score).slice(0,40)
 
-    return NextResponse.json({demo:false,queries,results})
+    return NextResponse.json({demo:false,zone:area,includedAreas:zone.areas,queries,results})
   }catch(error){
     return NextResponse.json({error:error.message||'Search failed'},{status:500})
   }
