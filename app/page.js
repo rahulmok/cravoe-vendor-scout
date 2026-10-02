@@ -22,6 +22,33 @@ const ZONES={
   }
 }
 const AREAS=Object.keys(ZONES)
+const CRM_STAGES=['New','Contacted','Replied','Interested','Meeting','Onboarded','Rejected']
+const REJECT_REASONS=['Too big / too established','Wrong cuisine fit','Too far / wrong zone','Weak reviews','Price positioning mismatch','Poor contactability','Not owner-led enough','Other']
+
+function outreachScore(lead){
+  let s=20
+  if(lead.phone) s+=25
+  if(lead.website) s+=8
+  if(lead.onSwiggy) s+=8
+  if(lead.onZomato) s+=8
+  if(lead.hiddenGem) s+=12
+  if(lead.fitStatus==='STRONG_FIT') s+=14
+  else if(lead.fitStatus==='POSSIBLE_FIT') s+=8
+  if(Number(lead.reviews||0)>=100&&Number(lead.reviews||0)<=1800) s+=5
+  if(lead.outletConfidence==='high') s+=4
+  return Math.max(0,Math.min(100,s))
+}
+
+function whyLead(lead){
+  const out=[]
+  const outlets=Number(lead.estimatedOutlets||lead.brandOutletCount||1)
+  out.push(outlets<=1?'Likely independent / single-outlet':outlets===2?'Small 2-outlet local group':`${outlets}+ outlets verified`)
+  out.push(`${Number(lead.rating||0).toFixed(1)}★ · ${Number(lead.reviews||0).toLocaleString('en-IN')} reviews`)
+  if(lead.phone) out.push('Direct phone / WhatsApp available')
+  else if(lead.hiddenGem) out.push('Hidden-gem profile verified')
+  else out.push(lead.researchReason||'Needs outreach judgment')
+  return out.slice(0,3)
+}
 
 function digits(phone=''){
   return phone.replace(/\D/g,'')
@@ -51,20 +78,27 @@ export default function Home(){
   const [loading,setLoading]=useState(false)
   const [message,setMessage]=useState('')
   const [demo,setDemo]=useState(false)
+  const [crm,setCrm]=useState({})
+  const [rejectFeedback,setRejectFeedback]=useState({})
 
   useEffect(()=>{
     try{
       setSaved(JSON.parse(localStorage.getItem('cravoe-scout-saved')||'[]'))
       setRejected(JSON.parse(localStorage.getItem('cravoe-scout-rejected')||'[]'))
+      setCrm(JSON.parse(localStorage.getItem('cravoe-scout-crm')||'{}'))
+      setRejectFeedback(JSON.parse(localStorage.getItem('cravoe-scout-reject-feedback')||'{}'))
     }catch{}
   },[])
 
   function persist(key,value){ localStorage.setItem(key,JSON.stringify(value)) }
 
-  async function scout(){
+  async function scout(overrides={}){
+    const effectiveCuisine=overrides.cuisine||cuisine
+    const effectiveArea=overrides.area||area
+    const effectiveMinReviews=Number(overrides.minReviews??minReviews)
     setLoading(true);setMessage('')
     try{
-      const res=await fetch('/api/scout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cuisine,area,minRating:4})})
+      const res=await fetch('/api/scout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cuisine:effectiveCuisine,area:effectiveArea,minRating:4})})
       const data=await res.json()
       if(!res.ok) throw new Error(data.error||'Search failed')
       const baseResults=data.results||[]
@@ -92,7 +126,7 @@ export default function Home(){
         })
         // Stage 2: verify in small parallel batches. Each Gemini call only researches 3 brands,
         // which gives much better outlet coverage than asking one call to investigate 12.
-        const deepTargets=screened.filter(x=>!x.automaticReject&&Number(x.reviews||0)>=minReviews)
+        const deepTargets=screened.filter(x=>!x.automaticReject&&Number(x.reviews||0)>=effectiveMinReviews)
         setMessage(`Brand screen done · deeply verifying ${deepTargets.length} candidates…`)
         const chunks=[]
         for(let i=0;i<deepTargets.length;i+=3) chunks.push(deepTargets.slice(i,i+3))
@@ -157,9 +191,23 @@ export default function Home(){
     const next=[{...lead,savedAt:new Date().toISOString()},...saved]
     setSaved(next);persist('cravoe-scout-saved',next)
   }
-  function rejectLead(id){
-    const next=Array.from(new Set([id,...rejected]))
+  function updateCrm(id,patch){
+    const next={...crm,[id]:{stage:'New',note:'',followUp:'',...(crm[id]||{}),...patch,updatedAt:new Date().toISOString()}}
+    setCrm(next);persist('cravoe-scout-crm',next)
+  }
+  function rejectLead(lead,reason='Other'){
+    const next=Array.from(new Set([lead.id,...rejected]))
     setRejected(next);persist('cravoe-scout-rejected',next)
+    const feedback={...rejectFeedback,[lead.id]:{reason,name:lead.name,cuisine:lead.cuisine,area:lead.area,at:new Date().toISOString()}}
+    setRejectFeedback(feedback);persist('cravoe-scout-reject-feedback',feedback)
+    updateCrm(lead.id,{stage:'Rejected'})
+  }
+  function findSimilar(lead){
+    setCuisine(lead.cuisine)
+    setArea(lead.area)
+    setMinReviews(50)
+    setMessage(`Finding more leads like ${lead.name}…`)
+    scout({cuisine:lead.cuisine,area:lead.area,minReviews:50})
   }
   async function copyPhone(phone){
     await navigator.clipboard.writeText(phone)
@@ -169,7 +217,7 @@ export default function Home(){
   return <main className="shell">
     <header className="topbar">
       <div><div className="eyebrow">CRAVOE / ACQUISITION</div><h1>Vendor Scout</h1></div>
-      <div className="saved-pill">{saved.length} saved leads</div>
+      <div className="saved-pill">{saved.length} saved · ${Object.values(crm).filter(x=>x.stage==='Onboarded').length} onboarded</div>
     </header>
 
     <section className="hero">
@@ -185,7 +233,7 @@ export default function Home(){
       <label><span>Cuisine</span><select value={cuisine} onChange={e=>setCuisine(e.target.value)}>{CUISINES.map(x=><option key={x}>{x}</option>)}</select></label>
       <label><span>Zone</span><select value={area} onChange={e=>setArea(e.target.value)}>{AREAS.map(x=><option key={x}>{x}</option>)}</select></label>
       <label><span>Min reviews</span><select value={minReviews} onChange={e=>setMinReviews(Number(e.target.value))}><option value="0">Any</option><option value="50">50+</option><option value="80">80+</option><option value="150">150+</option><option value="300">300+</option></select></label>
-      <button className="scout-btn" onClick={scout} disabled={loading}>{loading?'Scouting…':'Scout Restaurants'}</button>
+      <button className="scout-btn" onClick={()=>scout()} disabled={loading}>{loading?'Scouting…':'Scout Restaurants'}</button>
     </section>
 
     <section className="zone-panel">
@@ -204,7 +252,7 @@ export default function Home(){
         {!visible.length&&!loading&&!stillVerifying.length&&<div className="empty"><strong>No verified Cravoe-fit leads yet</strong><p>Try another cuisine/zone or lower the review threshold.</p></div>}
         {!!stillVerifying.length&&<div className="verifying-box"><strong>Verifying {stillVerifying.length} more candidate{stillVerifying.length===1?'':'s'}…</strong><span>They will not appear as leads until brand size and Cravoe fit are checked.</span></div>}
         <div className="cards">
-          {visible.map((lead,i)=><LeadCard key={lead.id} lead={lead} rank={i+1} saved={saved.some(s=>s.id===lead.id)} onSave={saveLead} onReject={rejectLead} onCopy={copyPhone}/>)}
+          {visible.map((lead,i)=><LeadCard key={lead.id} lead={lead} rank={i+1} saved={saved.some(s=>s.id===lead.id)} crm={crm[lead.id]||{stage:'New',note:'',followUp:''}} onSave={saveLead} onReject={rejectLead} onCopy={copyPhone} onCrm={updateCrm} onFindSimilar={findSimilar}/>)}
         </div>
         {!!filteredOut.length&&<section className="filtered-section">
           <div className="section-title"><span>FILTERED OUT</span><h3>{filteredOut.length} brands outside Cravoe target</h3></div>
@@ -217,7 +265,9 @@ export default function Home(){
         </section>}
       </div>
       <aside>
-        <div className="section-title"><span>SHORTLIST</span><h3>Saved leads</h3></div>
+        <div className="section-title"><span>PIPELINE</span><h3>Vendor acquisition</h3></div>
+        <div className="pipeline-stats">${CRM_STAGES.slice(0,6).map(stage=><span key={stage}><b>${Object.values(crm).filter(x=>x.stage===stage).length}</b>${stage}</span>)}</div>
+        <div className="section-title compact"><span>SHORTLIST</span><h3>Saved leads</h3></div>
         {!saved.length&&<p className="muted">Shortlist promising restaurants here. They stay saved on this browser.</p>}
         <div className="saved-list">{saved.slice(0,20).map(s=><div className="saved-item" key={s.id}><div><strong>{s.name}</strong><span>{s.area} · {s.cuisine}</span></div><b>{s.score}</b></div>)}</div>
       </aside>
@@ -225,8 +275,11 @@ export default function Home(){
   </main>
 }
 
-function LeadCard({lead,rank,saved,onSave,onReject,onCopy}){
+function LeadCard({lead,rank,saved,crm,onSave,onReject,onCopy,onCrm,onFindSimilar}){
   const wa=whatsappUrl(lead)
+  const [rejectReason,setRejectReason]=useState('Too big / too established')
+  const outreach=outreachScore(lead)
+  const why=whyLead(lead)
   const queryBase=`${lead.name} ${lead.area} Kolkata`
   return <article className="lead-card">
     <div className="rank">#{String(rank).padStart(2,'0')}</div>
@@ -238,6 +291,11 @@ function LeadCard({lead,rank,saved,onSave,onReject,onCopy}){
       </div>
       <div className="meta"><span>⭐ {lead.rating} <em>({Number(lead.reviews).toLocaleString('en-IN')})</em></span><span>📍 {lead.area}</span><span>🍽 {lead.cuisine}</span></div>
       <p className="address">{lead.address}</p>
+      <div className="dual-scores">
+        <div><span>CRAVOE FIT</span><strong>{lead.score}</strong><small>/100</small></div>
+        <div><span>OUTREACH READINESS</span><strong>{outreach}</strong><small>/100</small></div>
+      </div>
+      <div className="why-lead"><span>WHY THIS LEAD</span>{why.map((x,i)=><p key={i}>• {x}</p>)}</div>
       <p className="reason">{lead.reason}</p>
       {lead.brandChecked&&<div className={`brand-scan ${lead.automaticReject?'bad':lead.multiOutlet?'warn':'good'}`}>
         <strong>{lead.quickFit}</strong>
@@ -260,6 +318,14 @@ function LeadCard({lead,rank,saved,onSave,onReject,onCopy}){
       </div>}
       {lead.researchError&&<div className="research-error">AI research unavailable · {lead.researchError}</div>}
 
+      <div className="crm-box">
+        <div className="crm-grid">
+          <label><span>Stage</span><select value={crm.stage||'New'} onChange={e=>onCrm(lead.id,{stage:e.target.value})}>{CRM_STAGES.map(x=><option key={x}>{x}</option>)}</select></label>
+          <label><span>Follow up</span><input type="date" value={crm.followUp||''} onChange={e=>onCrm(lead.id,{followUp:e.target.value})}/></label>
+        </div>
+        <label className="crm-note"><span>Notes</span><textarea value={crm.note||''} onChange={e=>onCrm(lead.id,{note:e.target.value})} placeholder="Owner name, call notes, objections, next step…"/></label>
+      </div>
+
       <div className="contact">
         <div><span>DIRECT CONTACT</span><strong>{lead.phone||'No number returned by Google'}</strong></div>
         <div className="contact-actions">
@@ -272,13 +338,15 @@ function LeadCard({lead,rank,saved,onSave,onReject,onCopy}){
 
       <div className="actions">
         <button className="primary" onClick={()=>onSave(lead)} disabled={saved}>{saved?'Saved':'Shortlist'}</button>
+        <button onClick={()=>onFindSimilar(lead)}>Find more like this</button>
         {lead.maps&&<a href={lead.maps} target="_blank" rel="noreferrer">Google Maps</a>}
         {lead.website&&<a href={lead.website} target="_blank" rel="noreferrer">Website</a>}
         <a href={searchUrl(`${queryBase} Instagram`)} target="_blank" rel="noreferrer">Instagram</a>
         <a href={searchUrl(`${queryBase} Facebook`)} target="_blank" rel="noreferrer">Facebook</a>
         <a href={searchUrl(`${queryBase} Swiggy`)} target="_blank" rel="noreferrer">Swiggy</a>
         <a href={searchUrl(`${queryBase} Zomato`)} target="_blank" rel="noreferrer">Zomato</a>
-        <button className="reject" onClick={()=>onReject(lead.id)}>Reject</button>
+        <select className="reject-reason" value={rejectReason} onChange={e=>setRejectReason(e.target.value)}>{REJECT_REASONS.map(x=><option key={x}>{x}</option>)}</select>
+        <button className="reject" onClick={()=>onReject(lead,rejectReason)}>Reject</button>
       </div>
     </div>
   </article>
