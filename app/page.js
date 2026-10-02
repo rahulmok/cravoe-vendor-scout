@@ -64,7 +64,10 @@ function searchUrl(query){
 function whatsappUrl(lead){
   const num=indiaNumber(lead.phone)
   if(!num) return ''
-  const msg=`Hi, I'm Rahul from Cravoe. We work with selected Kolkata restaurants and help them reach additional customers without setup fees or ad spend. I came across ${lead.name} while researching highly rated ${lead.cuisine} restaurants in Kolkata. Would love to discuss featuring you on Cravoe.`
+  const reason=lead.hiddenGem
+    ? 'Your restaurant stood out as a strong local hidden-gem fit'
+    : 'Your restaurant stood out while we were researching quality local food businesses'
+  const msg=`Hi, I'm Rahul from Cravoe. ${reason} in ${lead.area}. We work with selected Kolkata restaurants to bring incremental prepaid orders with no onboarding charge and no ad spend required. Would love to discuss featuring ${lead.name} on Cravoe.`
   return `https://wa.me/${num}?text=${encodeURIComponent(msg)}`
 }
 
@@ -267,6 +270,11 @@ export default function Home(){
       <aside>
         <div className="section-title"><span>PIPELINE</span><h3>Vendor acquisition</h3></div>
         <div className="pipeline-stats">{CRM_STAGES.slice(0,6).map(stage=><span key={stage}><b>{Object.values(crm).filter(x=>x.stage===stage).length}</b>{stage}</span>)}</div>
+        <div className="learning-box">
+          <span>SCOUT LEARNING</span>
+          <strong>{Object.keys(rejectFeedback).length} decisions learned</strong>
+          <p>{Object.values(rejectFeedback).length?Object.entries(Object.values(rejectFeedback).reduce((a,x)=>({...a,[x.reason]:(a[x.reason]||0)+1}),{})).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([k,v])=>`${k}: ${v}`).join(' · '):'Reject reasons will build your acquisition preference profile.'}</p>
+        </div>
         <div className="section-title compact"><span>SHORTLIST</span><h3>Saved leads</h3></div>
         {!saved.length&&<p className="muted">Shortlist promising restaurants here. They stay saved on this browser.</p>}
         <div className="saved-list">{saved.slice(0,20).map(s=><div className="saved-item" key={s.id}><div><strong>{s.name}</strong><span>{s.area} · {s.cuisine}</span></div><b>{s.score}</b></div>)}</div>
