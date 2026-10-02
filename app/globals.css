@@ -109,3 +109,28 @@
 .zone-chips{display:flex;flex-wrap:wrap;gap:7px}
 .zone-chips span{font-size:10px;color:#c7c7c1;background:#171717;border:1px solid #2a2a2a;border-radius:999px;padding:6px 8px}
 @media(max-width:760px){.zone-panel{grid-template-columns:1fr;padding:14px}.zone-chips{gap:6px}}
+
+.dual-scores{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0}
+.dual-scores>div{background:#151515;border:1px solid #292929;border-radius:12px;padding:11px 12px}
+.dual-scores span{display:block;font-size:9px;letter-spacing:.12em;color:#777;font-weight:900}
+.dual-scores strong{font-size:24px;color:#f3f3ef}
+.dual-scores small{font-size:10px;color:#666}
+.why-lead{margin:10px 0 12px;padding:12px 13px;background:#141414;border:1px solid #282828;border-radius:12px}
+.why-lead>span{display:block;font-size:9px;letter-spacing:.13em;color:#7b7b76;font-weight:900;margin-bottom:6px}
+.why-lead p{margin:3px 0;font-size:11px;line-height:1.45;color:#c5c5bf}
+.crm-box{margin:14px 0;padding:12px;background:#11161b;border:1px solid #27313d;border-radius:12px}
+.crm-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.crm-box label span{display:block;margin-bottom:5px;font-size:9px;letter-spacing:.11em;color:#7f8996;font-weight:900;text-transform:uppercase}
+.crm-box select,.crm-box input,.crm-box textarea{width:100%;background:#151b22;color:#e8edf5;border:1px solid #303b49;border-radius:9px;padding:9px 10px;outline:0;font:inherit}
+.crm-note{display:block;margin-top:9px}
+.crm-box textarea{min-height:66px;resize:vertical}
+.reject-reason{background:#1a1414!important;border-color:#432727!important;color:#d9adad!important;min-width:180px}
+.pipeline-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-bottom:16px}
+.pipeline-stats span{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#151515;border:1px solid #262626;border-radius:9px;padding:8px 9px;font-size:10px;color:#8e8e88}
+.pipeline-stats b{font-size:14px;color:#f2f2ed}
+.section-title.compact{margin-top:16px}
+.learning-box{margin:14px 0 8px;padding:12px;background:#15120f;border:1px solid #392a1f;border-radius:11px}
+.learning-box>span{display:block;font-size:9px;letter-spacing:.13em;color:#9b7d68;font-weight:900}
+.learning-box strong{display:block;margin-top:4px;font-size:12px}
+.learning-box p{margin:5px 0 0;font-size:10px;line-height:1.45;color:#8f8178}
+@media(max-width:760px){.dual-scores,.crm-grid{grid-template-columns:1fr}.reject-reason{min-width:0;width:100%}}
