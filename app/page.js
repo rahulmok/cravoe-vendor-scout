@@ -217,7 +217,7 @@ export default function Home(){
   return <main className="shell">
     <header className="topbar">
       <div><div className="eyebrow">CRAVOE / ACQUISITION</div><h1>Vendor Scout</h1></div>
-      <div className="saved-pill">{saved.length} saved · ${Object.values(crm).filter(x=>x.stage==='Onboarded').length} onboarded</div>
+      <div className="saved-pill">{saved.length} saved · {Object.values(crm).filter(x=>x.stage==='Onboarded').length} onboarded</div>
     </header>
 
     <section className="hero">
@@ -266,7 +266,7 @@ export default function Home(){
       </div>
       <aside>
         <div className="section-title"><span>PIPELINE</span><h3>Vendor acquisition</h3></div>
-        <div className="pipeline-stats">${CRM_STAGES.slice(0,6).map(stage=><span key={stage}><b>${Object.values(crm).filter(x=>x.stage===stage).length}</b>${stage}</span>)}</div>
+        <div className="pipeline-stats">{CRM_STAGES.slice(0,6).map(stage=><span key={stage}><b>{Object.values(crm).filter(x=>x.stage===stage).length}</b>{stage}</span>)}</div>
         <div className="section-title compact"><span>SHORTLIST</span><h3>Saved leads</h3></div>
         {!saved.length&&<p className="muted">Shortlist promising restaurants here. They stay saved on this browser.</p>}
         <div className="saved-list">{saved.slice(0,20).map(s=><div className="saved-item" key={s.id}><div><strong>{s.name}</strong><span>{s.area} · {s.cuisine}</span></div><b>{s.score}</b></div>)}</div>
