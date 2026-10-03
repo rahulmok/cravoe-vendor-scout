@@ -4,7 +4,8 @@ const CUISINE_TERMS = {
   Bengali: ['bengali','bangla','fish','kosha','macher','bhetki'],
   Mughlai: ['mughlai','biryani','kebab','kabab','rezala','chaap'],
   'North Indian': ['north indian','punjabi','tandoor','tikka','naan','butter chicken'],
-  Bangladeshi: ['bangladeshi','dhaka','bangla','bhorta','ilish','hilsa']
+  Bangladeshi: ['bangladeshi','dhaka','bangla','bhorta','ilish','hilsa'],
+  Desserts: ['dessert','desserts','bakery','patisserie','pastry','cake','sweet','sweets','mithai','ice cream','gelato','chocolate','waffle']
 }
 
 const ZONES={
@@ -100,11 +101,21 @@ export async function POST(request){
     if(!apiKey) return NextResponse.json({demo:true,message:'Add GOOGLE_PLACES_API_KEY in Vercel for live data.',results:demo(cuisine,area)})
 
     const zone=ZONES[area]
-    const queries=[
-      `${cuisine} restaurants in ${area}, Kolkata`,
-      `best local ${cuisine} restaurant in ${area}, Kolkata`,
-      ...zone.seeds.map(seed=>`${cuisine} restaurant in ${seed}, Kolkata`)
-    ]
+    const queries=cuisine==='Desserts'
+      ? [
+          `dessert shops in ${area}, Kolkata`,
+          `best local bakery patisserie sweet shop in ${area}, Kolkata`,
+          `mithai sweets ice cream dessert in ${area}, Kolkata`,
+          ...zone.seeds.flatMap(seed=>[
+            `dessert shop in ${seed}, Kolkata`,
+            `bakery sweet shop in ${seed}, Kolkata`
+          ])
+        ]
+      : [
+          `${cuisine} restaurants in ${area}, Kolkata`,
+          `best local ${cuisine} restaurant in ${area}, Kolkata`,
+          ...zone.seeds.map(seed=>`${cuisine} restaurant in ${seed}, Kolkata`)
+        ]
 
     const settled=await Promise.allSettled(queries.map(q=>placesSearch(apiKey,q,minRating)))
     const merged=new Map()
