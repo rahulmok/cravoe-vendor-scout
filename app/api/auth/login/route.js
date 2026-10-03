@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createSession, SESSION_COOKIE, sessionCookieOptions, verifyPassword } from '../../../../lib/auth.js'
+import { authIsConfigured, createSession, SESSION_COOKIE, sessionCookieOptions, verifyPassword } from '../../../../lib/auth.js'
 import { guardApi } from '../../../../lib/api-guard.js'
 import { isRecord, readJson } from '../../../../lib/http.js'
 
@@ -7,7 +7,7 @@ export async function POST(request) {
   const denied = await guardApi(request, { scope: 'auth-login', auth: false, perMinute: 8, perDay: 40 })
   if (denied) return denied
   try {
-    if (!process.env.SCOUT_LOGIN_PASSWORD || process.env.SCOUT_LOGIN_PASSWORD.length < 16 || !process.env.SCOUT_AUTH_SECRET || process.env.SCOUT_AUTH_SECRET.length < 32) {
+    if (!authIsConfigured()) {
       return NextResponse.json({ error: 'Internal authentication is not configured.' }, { status: 503 })
     }
     const body = await readJson(request, 4096)
