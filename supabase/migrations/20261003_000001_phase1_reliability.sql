@@ -414,6 +414,8 @@ alter table public.vendor_scout_migration_imports enable row level security;
 alter table public.vendor_scout_legacy_import_rows enable row level security;
 alter table public.vendor_scout_api_rate_limits enable row level security;
 
+revoke all on function public.vendor_scout_touch_updated_at() from public, anon, authenticated;
+revoke all on function public.vendor_scout_record_initial_lead_status() from public, anon, authenticated;
 revoke all on function public.vendor_scout_consume_api_rate_limit(text,text,integer,integer) from public, anon, authenticated;
 revoke all on function public.vendor_scout_transition_restaurant_status(text,public.vendor_scout_lead_lifecycle_status,text,text,boolean,boolean) from public, anon, authenticated;
 revoke all on function public.vendor_scout_update_restaurant_crm(text,public.vendor_scout_lead_lifecycle_status,text,boolean,text,boolean,date,boolean,boolean,text) from public, anon, authenticated;
@@ -453,4 +455,4 @@ revoke all on table
   public.vendor_scout_migration_imports,
   public.vendor_scout_legacy_import_rows,
   public.vendor_scout_api_rate_limits
-from anon, authenticated;
+from public, anon, authenticated;
