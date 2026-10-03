@@ -210,7 +210,7 @@ do $$ begin
 exception when duplicate_object then null; end $$;
 
 create or replace function public.vendor_scout_consume_api_rate_limit(p_actor text, p_scope text, p_limit integer, p_window_seconds integer)
-returns boolean language plpgsql security invoker set search_path = public as $
+returns boolean language plpgsql security invoker set search_path = public as $$
 declare v_start bigint; v_count integer;
 begin
   if p_limit < 1 or p_window_seconds < 1 or length(p_actor) > 128 or length(p_scope) > 128 then return false; end if;
@@ -231,7 +231,7 @@ create or replace function public.vendor_scout_transition_restaurant_status(
   p_manual boolean default true,
   p_restore boolean default false
 )
-returns jsonb language plpgsql security invoker set search_path = public as $
+returns jsonb language plpgsql security invoker set search_path = public as $$
 declare v_id uuid; v_old public.vendor_scout_lead_lifecycle_status; v_next public.vendor_scout_lead_lifecycle_status; v_reason text; v_restore public.vendor_scout_lead_lifecycle_status;
 begin
   select id, lifecycle_status into v_id, v_old from public.vendor_scout_restaurants where google_place_id = p_google_place_id for update;
@@ -286,7 +286,7 @@ create or replace function public.vendor_scout_update_restaurant_crm(
   p_shortlisted boolean default null,
   p_actor text default 'owner'
 )
-returns jsonb language plpgsql security invoker set search_path = public as $
+returns jsonb language plpgsql security invoker set search_path = public as $$
 declare v_row public.vendor_scout_restaurants%rowtype; v_transition jsonb; v_status public.vendor_scout_lead_lifecycle_status;
 begin
   select * into v_row from public.vendor_scout_restaurants where google_place_id = p_google_place_id for update;
@@ -330,7 +330,7 @@ begin
 end $$;
 
 create or replace function public.vendor_scout_start_restaurant_research(p_google_place_id text, p_provider text, p_actor text default 'owner')
-returns jsonb language plpgsql security invoker set search_path = public as $
+returns jsonb language plpgsql security invoker set search_path = public as $$
 declare v_id uuid; v_old public.vendor_scout_lead_lifecycle_status; v_run_id uuid; v_attempt integer;
 begin
   select id, lifecycle_status into v_id, v_old from public.vendor_scout_restaurants where google_place_id = p_google_place_id for update;
@@ -361,7 +361,7 @@ create or replace function public.vendor_scout_finish_restaurant_research(
   p_error_code text default null,
   p_actor text default 'owner'
 )
-returns jsonb language plpgsql security invoker set search_path = public as $
+returns jsonb language plpgsql security invoker set search_path = public as $$
 declare v_id uuid; v_old public.vendor_scout_lead_lifecycle_status; v_next public.vendor_scout_lead_lifecycle_status; v_reason text; v_fit text; v_override boolean;
 begin
   select id, lifecycle_status into v_id, v_old from public.vendor_scout_restaurants where google_place_id = p_google_place_id for update;
