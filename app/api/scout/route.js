@@ -1,4 +1,7 @@
 import { NextResponse } from 'next/server'
+import { guardApi } from '../../../lib/api-guard.js'
+import { isRecord, readJson, safeErrorMessage } from '../../../lib/http.js'
+import { upsertDiscoveredRestaurants } from '../../../lib/supabase.js'
 
 const CUISINE_TERMS = {
   Bengali: ['bengali','bangla','fish','kosha','macher','bhetki'],
@@ -91,11 +94,19 @@ async function placesSearch(apiKey,textQuery,minRating){
 }
 
 export async function POST(request){
+  const denied=await guardApi(request,{scope:'scout',perMinute:3,perDay:30})
+  if(denied) return denied
   try{
-    const body=await request.json()
+    const body=await readJson(request,8192)
+    if(!isRecord(body)||!Object.hasOwn(CUISINE_TERMS,String(body.cuisine||'Bengali'))||!ZONES[body.area||'South Kolkata']){
+      return NextResponse.json({error:'Choose a supported cuisine and Kolkata zone.'},{status:400})
+    }
     const cuisine=body.cuisine||'Bengali'
-    const area=ZONES[body.area]?body.area:'South Kolkata'
-    const minRating=Number(body.minRating||4)
+    const area=body.area||'South Kolkata'
+    const minRating=Number(body.minRating??4)
+    if(!Number.isFinite(minRating)||minRating<3.5||minRating>5){
+      return NextResponse.json({error:'Rating threshold must be between 3.5 and 5.'},{status:400})
+    }
     const apiKey=process.env.GOOGLE_PLACES_API_KEY
     if(!apiKey) return NextResponse.json({demo:true,message:'Add GOOGLE_PLACES_API_KEY in Vercel for live data.',results:demo(cuisine,area)})
 
@@ -124,13 +135,19 @@ export async function POST(request){
         id:p.id,name:p.displayName?.text||'Unnamed restaurant',rating:p.rating||0,reviews:p.userRatingCount||0,
         address:p.formattedAddress||'',phone:p.internationalPhoneNumber||p.nationalPhoneNumber||'',
         website:p.websiteUri||'',maps:p.googleMapsUri||'',photoName:p.photos?.[0]?.name||'',cuisine,area,score,
-        reason:reason(p,score),status:'New'
+        reason:reason(p,score),status:'New',lifecycleStatus:'NEW',researchStatus:'pending'
       }
     }).sort((a,b)=>b.score-a.score).slice(0,40)
 
+    await upsertDiscoveredRestaurants(results.map(lead=>({
+      google_place_id:lead.id,name:lead.name,address:lead.address,area:lead.area,cuisine:lead.cuisine,
+      rating:lead.rating,review_count:lead.reviews,phone:lead.phone||null,website:lead.website||null,
+      maps_url:lead.maps||null,score:lead.score,metadata:{source:'google_places',reason:lead.reason}
+    })))
     return NextResponse.json({demo:false,zone:area,includedAreas:zone.areas,queries,results})
   }catch(error){
-    return NextResponse.json({error:error.message||'Search failed'},{status:500})
+    const status=Number(error?.status)||500
+    return NextResponse.json({error:safeErrorMessage(error)},{status:status>=400&&status<=599?status:500})
   }
 }
 

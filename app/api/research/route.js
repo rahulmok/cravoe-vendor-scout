@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server'
 import { GoogleGenAI } from '@google/genai'
 import { ExternalAccountClient } from 'google-auth-library'
 import { getVercelOidcToken } from '@vercel/oidc'
+import { guardApi } from '../../../lib/api-guard.js'
+import { isRecord, readJson, safeErrorMessage } from '../../../lib/http.js'
+import { lifecycleFromResearch } from '../../../lib/lead-state.js'
+import { finishResearchRun, safeProviderError, startResearchRun } from '../../../lib/supabase.js'
+import { normalizeResearchLead } from '../../../lib/validation.js'
 
 const MODEL_CANDIDATES=[
   process.env.GEMINI_MODEL,
@@ -132,12 +137,24 @@ async function callGemini(model,prompt){
 }
 
 export async function POST(request){
+  const denied=await guardApi(request,{scope:'research-single',perMinute:4,perDay:20})
+  if(denied) return denied
+  let trackedRun=null
+  let trackedPlaceId=''
   try{
-    const lead=await request.json()
+    const input=await readJson(request,16384)
+    if(!isRecord(input)){
+      return NextResponse.json({error:'A valid restaurant listing is required.'},{status:400})
+    }
+    let lead
+    try{lead=normalizeResearchLead(input)}catch{return NextResponse.json({error:'A valid restaurant listing is required.'},{status:400})}
+    trackedPlaceId=lead.id
+    trackedRun=await startResearchRun({placeId:lead.id,provider:'Vertex Gemini + Google Search (single retry)'})
 
     if(!vertexConfigured()){
+      await finishResearchRun({runId:trackedRun.run_id,placeId:lead.id,status:'failed',errorCode:'provider_not_configured'})
       return NextResponse.json({
-        error:'Vertex research is not configured. Add the same Vertex/OIDC environment variables used by Cravoe Agent.'
+        error:'Vertex research is not configured.'
       },{status:503})
     }
 
@@ -212,7 +229,8 @@ Size guide:
     }
 
     if(!gemini){
-      return NextResponse.json({error:`Vertex Gemini research failed: ${lastError.slice(0,600)}`},{status:502})
+      await finishResearchRun({runId:trackedRun.run_id,placeId:lead.id,status:'failed',errorCode:'provider_failed'})
+      return NextResponse.json({error:safeProviderError({status:502})},{status:502})
     }
 
     const text=gemini.text||''
@@ -263,7 +281,7 @@ Size guide:
       tooBigForCravoe?'too large for Cravoe target':'size not automatically disqualifying'
     ].join(' • ')
 
-    return NextResponse.json({
+    const result={
       researched:true,
       researchProvider:'Vertex Gemini + Google Search',
       modelUsed,
@@ -283,9 +301,19 @@ Size guide:
       originalScore:Number(lead.score||0),
       score:researchedScore,
       researchDelta,
-      researchReason
+      researchReason,
+      rejectionReason:tooBigForCravoe?researchReason:null
+    }
+    result.researchStatus=sources.length&&result.evidenceSummary?'complete':'partial'
+    result.lifecycleStatus=lifecycleFromResearch(result)
+    await finishResearchRun({
+      runId:trackedRun.run_id,placeId:lead.id,status:result.researchStatus,
+      result,errorCode:result.researchStatus==='partial'?'incomplete_evidence':null,
     })
+    return NextResponse.json(result)
   }catch(error){
-    return NextResponse.json({error:error.message||'Vertex Gemini research failed'},{status:500})
+    if(trackedRun) await finishResearchRun({runId:trackedRun.run_id,placeId:trackedPlaceId,status:'failed',errorCode:'provider_error'}).catch(()=>{})
+    const status=Number(error?.status)||500
+    return NextResponse.json({error:safeErrorMessage(error)},{status:status>=400&&status<=599?status:500})
   }
 }
