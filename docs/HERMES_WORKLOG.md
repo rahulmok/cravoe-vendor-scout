@@ -28,9 +28,10 @@ Resume the existing `vendor-scout-v2` working tree, validate existing Phase 1 wo
 - Live Supabase migration application and end-to-end cloud persistence/import verification — NOT RUN; no project credentials/configuration provided.
 
 ### Git
-- Branch: `vendor-scout-v2`.
-- Commit hash/message: pending.
-- Push result: pending; remote branch must be created without rewriting history.
+- Branch: `vendor-scout-v2` tracking `origin/vendor-scout-v2`.
+- Commit `cc985ea` — `feat: add Phase 1 reliability foundations`.
+- Push succeeded; fetched remote ref matches local commit `cc985eabafb7f4802debb21169a931c21e980133`.
+- Main untouched; no deployment performed.
 
 ### Remaining
 - Review and complete Supabase SQL/persistence call-path and evidence wiring; migration has not been applied to a live database.
