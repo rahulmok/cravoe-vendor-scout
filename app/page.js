@@ -2,7 +2,7 @@
 
 import { useEffect,useMemo,useState } from 'react'
 
-const CUISINES=['Bengali','Mughlai','North Indian','Bangladeshi']
+const CUISINES=['Bengali','Mughlai','North Indian','Bangladeshi','Desserts']
 const ZONES={
   'South Kolkata':{
     description:'Core South Kolkata — broad enough to scout properly, but excludes Behala, Joka, Thakurpukur and very deep south.',
