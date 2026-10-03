@@ -5,7 +5,7 @@ const CUISINE_TERMS = {
   Mughlai: ['mughlai','biryani','kebab','kabab','rezala','chaap'],
   'North Indian': ['north indian','punjabi','tandoor','tikka','naan','butter chicken'],
   Bangladeshi: ['bangladeshi','dhaka','bangla','bhorta','ilish','hilsa'],
-  Desserts: ['dessert','desserts','bakery','patisserie','pastry','cake','sweet','sweets','mithai','ice cream','gelato','chocolate','waffle']
+  Desserts: ['dessert','desserts','bakery','patisserie','pastry','cake','sweet','sweets','mithai','chocolate','waffle']
 }
 
 const ZONES={
@@ -105,7 +105,7 @@ export async function POST(request){
       ? [
           `dessert shops in ${area}, Kolkata`,
           `best local bakery patisserie sweet shop in ${area}, Kolkata`,
-          `mithai sweets ice cream dessert in ${area}, Kolkata`,
+          `mithai sweets dessert in ${area}, Kolkata`,
           ...zone.seeds.flatMap(seed=>[
             `dessert shop in ${seed}, Kolkata`,
             `bakery sweet shop in ${seed}, Kolkata`
