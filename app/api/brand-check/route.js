@@ -1,8 +1,4 @@
 import { NextResponse } from 'next/server'
-import { guardApi } from '../../../lib/api-guard.js'
-import { isRecord, readJson, safeErrorMessage } from '../../../lib/http.js'
-import { finishResearchRun, recordStatusTransition, startResearchRun } from '../../../lib/supabase.js'
-import { normalizeResearchLead } from '../../../lib/validation.js'
 
 function normName(s=''){
   return String(s)
@@ -27,25 +23,10 @@ function sameBrand(base,candidate){
 }
 
 export async function POST(request){
-  const denied=await guardApi(request,{scope:'brand-check',perMinute:24,perDay:240})
-  if(denied) return denied
-  let run=null
-  let placeId=''
   try{
-    const input=await readJson(request,16384)
-    if(!isRecord(input)){
-      return NextResponse.json({error:'A valid restaurant name and listing ID are required.'},{status:400})
-    }
-    let lead
-    try{lead=normalizeResearchLead(input)}catch{return NextResponse.json({error:'A valid restaurant name and listing ID are required.'},{status:400})}
-    placeId=lead.id
-    run=await startResearchRun({placeId:lead.id,provider:'Google Places rapid brand screen'})
+    const lead=await request.json()
     const apiKey=process.env.GOOGLE_PLACES_API_KEY
-    if(!apiKey){
-      await finishResearchRun({runId:run.run_id,placeId:lead.id,status:'failed',errorCode:'places_not_configured'})
-      run=null
-      return NextResponse.json({error:'Google Places is not configured.'},{status:503})
-    }
+    if(!apiKey) return NextResponse.json({error:'Google Places API key missing'},{status:503})
 
     const queries=[
       `"${lead.name}" restaurant Kolkata West Bengal India`,
@@ -63,16 +44,10 @@ export async function POST(request){
       body:JSON.stringify({textQuery,languageCode:'en',regionCode:'IN',pageSize:20}),
       cache:'no-store'
     }).then(async response=>{
-      if(!response.ok) throw new Error('Places provider request failed')
+      if(!response.ok) throw new Error(await response.text())
       return (await response.json()).places||[]
     })))
 
-    const successfulCalls=calls.filter(x=>x.status==='fulfilled').length
-    if(!successfulCalls){
-      await finishResearchRun({runId:run.run_id,placeId:lead.id,status:'failed',errorCode:'places_provider_failed'})
-      run=null
-      return NextResponse.json({error:'The restaurant footprint scan is temporarily unavailable.'},{status:502})
-    }
     const rawPlaces=calls.flatMap(x=>x.status==='fulfilled'?x.value:[])
     const matches=rawPlaces
       .filter(p=>p.businessStatus!=='CLOSED_PERMANENTLY')
@@ -110,30 +85,6 @@ export async function POST(request){
     if(maxReviews>=8000) score=Math.min(score,35)
     else if(famousSignal) score=Math.min(score,62)
 
-    const brandScanReason=automaticReject
-      ? `${outletCount}+ matching Kolkata outlets found by Google Places — outside Cravoe's hidden-gem target`
-      : multiOutlet
-        ? `${outletCount} matching outlets found — small group, verify before outreach`
-        : famousSignal
-          ? 'Very high public review volume — may be too established for Cravoe'
-          : 'No obvious multi-outlet footprint found in fast Google Places scan'
-    const lifecycleStatus=automaticReject?'REJECTED':'REVIEW'
-    const sources=unique.slice(0,10).map(place=>({
-      title:place.name||'Google Places outlet',
-      url:`https://www.google.com/maps/search/?api=1&query_place_id=${encodeURIComponent(place.id)}`,
-      outletId:place.id,
-      address:place.address,
-    }))
-    await finishResearchRun({
-      runId:run.run_id,placeId:lead.id,status:'partial',
-      result:{sourceKind:'google_places',sources,brandOutletCount:outletCount,quickFit,brandScanReason,automaticReject},
-      errorCode:successfulCalls<calls.length?'partial_places_scan':'quick_screen_only',
-    })
-    run=null
-    if(automaticReject) await recordStatusTransition({
-      placeId:lead.id,status:'REJECTED',reason:brandScanReason,manual:false,
-    })
-
     return NextResponse.json({
       brandChecked:true,
       brandOutletCount:outletCount,
@@ -144,14 +95,15 @@ export async function POST(request){
       establishedVisibilityReject:maxReviews>=8000,
       quickFit,
       score,
-      lifecycleStatus,
-      researchStatus:'partial',
-      sources,
-      brandScanReason
+      brandScanReason:automaticReject
+        ? `${outletCount}+ matching Kolkata outlets found by Google Places — outside Cravoe's hidden-gem target`
+        : multiOutlet
+          ? `${outletCount} matching outlets found — small group, verify before outreach`
+          : famousSignal
+            ? 'Very high public review volume — may be too established for Cravoe'
+            : 'No obvious multi-outlet footprint found in fast Google Places scan'
     })
   }catch(error){
-    if(run) await finishResearchRun({runId:run.run_id,placeId,status:'failed',errorCode:'places_provider_error'}).catch(()=>{})
-    const status=Number(error?.status)||500
-    return NextResponse.json({error:safeErrorMessage(error)},{status:status>=400&&status<=599?status:500})
+    return NextResponse.json({error:error.message||'Brand scan failed'},{status:500})
   }
 }

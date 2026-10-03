@@ -2,11 +2,6 @@ import { NextResponse } from 'next/server'
 import { GoogleGenAI } from '@google/genai'
 import { ExternalAccountClient } from 'google-auth-library'
 import { getVercelOidcToken } from '@vercel/oidc'
-import { guardApi } from '../../../lib/api-guard.js'
-import { isRecord, readJson, safeErrorMessage } from '../../../lib/http.js'
-import { lifecycleFromResearch } from '../../../lib/lead-state.js'
-import { finishResearchRun, safeProviderError, startResearchRun } from '../../../lib/supabase.js'
-import { normalizeResearchLead } from '../../../lib/validation.js'
 
 let ai=null
 
@@ -47,28 +42,11 @@ function cleanJson(text=''){
 function clamp(n,min,max){return Math.max(min,Math.min(max,n))}
 
 export async function POST(request){
-  const denied=await guardApi(request,{scope:'research-batch',perMinute:6,perDay:40})
-  if(denied) return denied
-  const trackedRuns=[]
-  const finishTracked=async(status,errorCode,resultForLead=()=>({}))=>Promise.allSettled(trackedRuns.map(({lead,run})=>
-    finishResearchRun({runId:run.run_id,placeId:lead.id,status,result:resultForLead(lead),errorCode})
-  ))
   try{
-    const body=await readJson(request,32768)
-    if(!isRecord(body)||!Array.isArray(body.leads)||body.leads.length>3){
-      return NextResponse.json({error:'Research accepts at most three valid leads per request.'},{status:400})
-    }
-    let leads
-    try{leads=body.leads.map(normalizeResearchLead)}catch{return NextResponse.json({error:'Every lead needs valid, bounded restaurant data.'},{status:400})}
-    if(!leads.length) return NextResponse.json({results:[],sources:[]})
-    for(const lead of leads){
-      const run=await startResearchRun({placeId:lead.id})
-      trackedRuns.push({lead,run})
-    }
-    if(!configured()){
-      await finishTracked('failed','provider_not_configured')
-      return NextResponse.json({error:'Vertex research is not configured.'},{status:503})
-    }
+    if(!configured()) return NextResponse.json({error:'Vertex AI not configured'},{status:503})
+    const body=await request.json()
+    const leads=Array.isArray(body.leads)?body.leads.slice(0,3):[]
+    if(!leads.length) return NextResponse.json({results:[]})
 
     const compact=leads.map((x,i)=>({
       index:i,
@@ -167,7 +145,7 @@ ${JSON.stringify(compact)}
 `
 
     const models=[process.env.GEMINI_MODEL,'gemini-2.5-flash'].filter((x,i,a)=>x&&a.indexOf(x)===i)
-    let res
+    let res,lastError=''
     for(const model of models){
       try{
         res=await client().models.generateContent({
@@ -176,12 +154,9 @@ ${JSON.stringify(compact)}
           config:{temperature:0.05,maxOutputTokens:6000,tools:[{googleSearch:{}}]}
         })
         break
-      }catch{}
+      }catch(e){lastError=String(e?.message||e)}
     }
-    if(!res){
-      await finishTracked('failed','provider_failed')
-      return NextResponse.json({error:safeProviderError({status:502})},{status:502})
-    }
+    if(!res) return NextResponse.json({error:`Batch research failed: ${lastError.slice(0,500)}`},{status:502})
 
     const parsed=cleanJson(res.text||'')
     const rows=Array.isArray(parsed.results)?parsed.results:[]
@@ -242,29 +217,8 @@ ${JSON.stringify(compact)}
       }
       if(sources.length>=10) break
     }
-    const byResult=new Map(results.map(row=>[String(row.id),row]))
-    const completeResults=[]
-    for(const {lead,run} of trackedRuns){
-      const row=byResult.get(String(lead.id))
-      const finalRow=row||{
-        id:lead.id,researched:false,fitStatus:'REVIEW',evidenceSummary:'Research did not return a result for this lead.',
-        researchReason:'Retry research to complete verification.',
-      }
-      const researchStatus=row&&row.evidenceSummary&&sources.length&&row.outletLocations.length?'complete':'partial'
-      finalRow.researchStatus=researchStatus
-      finalRow.lifecycleStatus=lifecycleFromResearch(finalRow)
-      if(finalRow.lifecycleStatus==='REJECTED') finalRow.rejectionReason=finalRow.researchReason||'Research indicates this business is outside the current Cravoe target'
-      if(researchStatus==='partial'&&!row) finalRow.researchError='Research returned no result for this lead.'
-      await finishResearchRun({
-        runId:run.run_id,placeId:lead.id,status:researchStatus,
-        result:{...finalRow,sources},errorCode:researchStatus==='partial'?'incomplete_evidence':null,
-      })
-      completeResults.push(finalRow)
-    }
-    return NextResponse.json({results:completeResults,sources})
+    return NextResponse.json({results,sources})
   }catch(error){
-    await finishTracked('failed','provider_error')
-    const status=Number(error?.status)||500
-    return NextResponse.json({error:safeErrorMessage(error)},{status:status>=400&&status<=599?status:500})
+    return NextResponse.json({error:error.message||'Batch research failed'},{status:500})
   }
 }

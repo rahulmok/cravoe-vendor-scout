@@ -1,8 +1,6 @@
 'use client'
 
 import { useEffect,useMemo,useState } from 'react'
-import { prepareDemoResults } from '../lib/scout-results.js'
-import { lifecycleFromLegacyStage, lifecycleFromResearch } from '../lib/lead-state.js'
 
 const CUISINES=['Bengali','Mughlai','North Indian','Bangladeshi']
 const ZONES={
@@ -24,13 +22,8 @@ const ZONES={
   }
 }
 const AREAS=Object.keys(ZONES)
-const CRM_STAGES=['NEW','RESEARCHING','QUALIFIED','REVIEW','REJECTED','CONTACTED','INTERESTED','ONBOARDED']
+const CRM_STAGES=['New','Contacted','Replied','Interested','Meeting','Onboarded','Rejected']
 const REJECT_REASONS=['Too big / too established','Wrong cuisine fit','Too far / wrong zone','Weak reviews','Price positioning mismatch','Poor contactability','Not owner-led enough','Other']
-const STORAGE_KEYS=['cravoe-scout-saved','cravoe-scout-rejected','cravoe-scout-crm','cravoe-scout-reject-feedback']
-
-function readLocal(key,fallback){
-  try{return JSON.parse(localStorage.getItem(key)||JSON.stringify(fallback))}catch{return fallback}
-}
 
 function outreachScore(lead){
   let s=20
@@ -49,7 +42,7 @@ function outreachScore(lead){
 function whyLead(lead){
   const out=[]
   const outlets=Number(lead.estimatedOutlets||lead.brandOutletCount||1)
-  out.push(lead.demo?'Demo profile — outlet count not verified':outlets<=1?'Likely independent / single-outlet':outlets===2?'Small 2-outlet local group':`${outlets}+ outlets verified`)
+  out.push(outlets<=1?'Likely independent / single-outlet':outlets===2?'Small 2-outlet local group':`${outlets}+ outlets verified`)
   out.push(`${Number(lead.rating||0).toFixed(1)}★ · ${Number(lead.reviews||0).toLocaleString('en-IN')} reviews`)
   if(lead.phone) out.push('Direct phone / WhatsApp available')
   else if(lead.hiddenGem) out.push('Hidden-gem profile verified')
@@ -90,20 +83,14 @@ export default function Home(){
   const [demo,setDemo]=useState(false)
   const [crm,setCrm]=useState({})
   const [rejectFeedback,setRejectFeedback]=useState({})
-  const [cloudRejected,setCloudRejected]=useState([])
-  const [showRejected,setShowRejected]=useState(false)
 
   useEffect(()=>{
-    const storedSaved=readLocal('cravoe-scout-saved',[])
-    const storedRejected=readLocal('cravoe-scout-rejected',[])
-    const storedCrm=readLocal('cravoe-scout-crm',{})
-    const storedFeedback=readLocal('cravoe-scout-reject-feedback',{})
-    setSaved(Array.isArray(storedSaved)?storedSaved:[])
-    setRejected(Array.isArray(storedRejected)?storedRejected.map(String):[])
-    setCrm(Object.fromEntries(Object.entries(storedCrm&&typeof storedCrm==='object'?storedCrm:{}).map(([id,value])=>[
-      id,{...value,stage:lifecycleFromLegacyStage(value?.stage),manualOverride:Boolean(value?.stage)}
-    ])))
-    setRejectFeedback(storedFeedback&&typeof storedFeedback==='object'?storedFeedback:{})
+    try{
+      setSaved(JSON.parse(localStorage.getItem('cravoe-scout-saved')||'[]'))
+      setRejected(JSON.parse(localStorage.getItem('cravoe-scout-rejected')||'[]'))
+      setCrm(JSON.parse(localStorage.getItem('cravoe-scout-crm')||'{}'))
+      setRejectFeedback(JSON.parse(localStorage.getItem('cravoe-scout-reject-feedback')||'{}'))
+    }catch{}
   },[])
 
   function persist(key,value){ localStorage.setItem(key,JSON.stringify(value)) }
@@ -118,9 +105,9 @@ export default function Home(){
       const data=await res.json()
       if(!res.ok) throw new Error(data.error||'Search failed')
       const baseResults=data.results||[]
+      setResults([])
       setDemo(Boolean(data.demo))
       setMessage(data.message||`${baseResults.length} candidates found`)
-      setResults(data.demo?prepareDemoResults(baseResults):baseResults.map(lead=>({...lead,lifecycleStatus:'NEW',researchStatus:'pending'})))
 
       if(!data.demo&&baseResults.length){
         // Stage 1: very fast deterministic Google Places brand-footprint scan.
@@ -150,10 +137,10 @@ export default function Home(){
           try{
             const rr=await fetch('/api/research-batch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({leads:group})})
             const research=await rr.json()
-            if(!rr.ok) return {rows:group.map(x=>({...x,fitStatus:'REVIEW',lifecycleStatus:'REVIEW',researchStatus:'failed',researchError:research.error||'Verification failed'})),sources:[]}
+            if(!rr.ok) return {rows:group.map(x=>({...x,fitStatus:'REVIEW',researchError:research.error||'Verification failed'})),sources:[]}
             return {rows:research.results||[],sources:research.sources||[]}
           }catch{
-            return {rows:group.map(x=>({...x,fitStatus:'REVIEW',lifecycleStatus:'REVIEW',researchStatus:'failed',researchError:'Verification failed'})),sources:[]}
+            return {rows:group.map(x=>({...x,fitStatus:'REVIEW',researchError:'Verification failed'})),sources:[]}
           }
         }))
         const batchRows=verified.flatMap(x=>x.rows)
@@ -163,7 +150,7 @@ export default function Home(){
         })
         const researchMap=new Map(batchRows.map(x=>[x.id,x]))
         screened=screened.map(x=>{
-          if(x.automaticReject) return {...x,fitStatus:'REJECT',lifecycleStatus:'REJECTED',researchStatus:'partial',tooBigForCravoe:true,researched:true,researchReason:x.brandScanReason}
+          if(x.automaticReject) return {...x,fitStatus:'REJECT',tooBigForCravoe:true,researched:true,researchReason:x.brandScanReason}
           const research=researchMap.get(x.id)
           return research?{...x,...research,sources:sourceMap.get(x.id)||[]}:x
         }).sort((a,b)=>{
@@ -185,142 +172,38 @@ export default function Home(){
   const visible=useMemo(()=>results.filter(r=>
     r.reviews>=minReviews &&
     !rejected.includes(r.id) &&
-    r.lifecycleStatus!=='REJECTED' &&
-    lifecycleFromLegacyStage(crm[r.id]?.stage||'NEW')!=='REJECTED' &&
-    (r.researched===true || r.demo===true || r.researchStatus==='failed') &&
+    r.researched===true &&
     ['STRONG_FIT','POSSIBLE_FIT','REVIEW'].includes(r.fitStatus) &&
     !r.automaticReject &&
     !r.tooBigForCravoe
-  ),[results,minReviews,rejected,crm])
+  ),[results,minReviews,rejected])
 
   const filteredOut=useMemo(()=>results.filter(r=>
-    r.fitStatus==='REJECT' || r.lifecycleStatus==='REJECTED' || lifecycleFromLegacyStage(crm[r.id]?.stage||'NEW')==='REJECTED' || r.automaticReject || r.tooBigForCravoe
-  ),[results,crm])
+    r.fitStatus==='REJECT' || r.automaticReject || r.tooBigForCravoe
+  ),[results])
 
   const stillVerifying=useMemo(()=>results.filter(r=>
     r.reviews>=minReviews &&
     !r.automaticReject &&
     !r.tooBigForCravoe &&
-    r.lifecycleStatus!=='REJECTED' &&
-    r.researched!==true &&
-    r.researchStatus!=='failed' &&
-    !r.demo
+    r.researched!==true
   ),[results,minReviews])
-
-  const rejectedCandidates=useMemo(()=>{
-    const byId=new Map(cloudRejected.filter(lead=>lead?.id).map(lead=>[lead.id,lead]))
-    for(const id of rejected){
-      const feedback=rejectFeedback[id]||{}
-      const lead=results.find(row=>row.id===id)||saved.find(row=>row.id===id)||feedback.snapshot||{
-        id,name:feedback.name||'Restaurant details unavailable',area:feedback.area||'',cuisine:feedback.cuisine||''
-      }
-      byId.set(id,{...lead,lifecycleStatus:'REJECTED',rejectionReason:feedback.reason||lead.rejectionReason||'Legacy rejection — reason not recorded'})
-    }
-    return [...byId.values()]
-  },[cloudRejected,rejected,rejectFeedback,results,saved])
-
-  async function syncLead(placeId,patch){
-    if(String(placeId).startsWith('demo-')) return null
-    const response=await fetch('/api/leads',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({placeId,...patch})})
-    const data=await response.json()
-    if(!response.ok) throw new Error(data.error||'Cloud sync failed')
-    return data
-  }
 
   function saveLead(lead){
     if(saved.some(s=>s.id===lead.id)) return
     const next=[{...lead,savedAt:new Date().toISOString()},...saved]
     setSaved(next);persist('cravoe-scout-saved',next)
-    syncLead(lead.id,{shortlisted:true}).catch(error=>setMessage(`Saved in this browser; cloud sync failed: ${error.message}`))
   }
   function updateCrm(id,patch){
-    if(Object.hasOwn(patch,'stage')&&lifecycleFromLegacyStage(patch.stage)==='REJECTED'){
-      setMessage('Use the Reject action and choose a reason to reject this lead.')
-      return
-    }
-    const next={...crm,[id]:{stage:'NEW',note:'',followUp:'',...(crm[id]||{}),...patch,manualOverride:Object.hasOwn(patch,'stage')?true:crm[id]?.manualOverride,updatedAt:new Date().toISOString()}}
+    const next={...crm,[id]:{stage:'New',note:'',followUp:'',...(crm[id]||{}),...patch,updatedAt:new Date().toISOString()}}
     setCrm(next);persist('cravoe-scout-crm',next)
-    if(Object.hasOwn(patch,'stage')){
-      const status=lifecycleFromLegacyStage(patch.stage)
-      syncLead(id,{lifecycleStatus:status}).catch(error=>setMessage(`Status saved in this browser; cloud sync failed: ${error.message}`))
-      setResults(rows=>rows.map(row=>row.id===id?{...row,lifecycleStatus:status}:row))
-    }
-  }
-  function persistLeadFields(id,patch){
-    syncLead(id,patch).catch(error=>setMessage(`Saved in this browser; cloud sync failed: ${error.message}`))
   }
   function rejectLead(lead,reason='Other'){
     const next=Array.from(new Set([lead.id,...rejected]))
     setRejected(next);persist('cravoe-scout-rejected',next)
-    const previousLifecycleStatus=lead.lifecycleStatus||lifecycleFromLegacyStage(crm[lead.id]?.stage||'REVIEW')
-    const feedback={...rejectFeedback,[lead.id]:{reason,name:lead.name,cuisine:lead.cuisine,area:lead.area,previousLifecycleStatus,previousManualOverride:Boolean(crm[lead.id]?.manualOverride),snapshot:lead,at:new Date().toISOString()}}
+    const feedback={...rejectFeedback,[lead.id]:{reason,name:lead.name,cuisine:lead.cuisine,area:lead.area,at:new Date().toISOString()}}
     setRejectFeedback(feedback);persist('cravoe-scout-reject-feedback',feedback)
-    const nextCrm={...crm,[lead.id]:{stage:'REJECTED',note:crm[lead.id]?.note||'',followUp:crm[lead.id]?.followUp||'',updatedAt:new Date().toISOString()}}
-    setCrm(nextCrm);persist('cravoe-scout-crm',nextCrm)
-    setResults(rows=>rows.map(row=>row.id===lead.id?{...row,lifecycleStatus:'REJECTED',rejectionReason:reason}:row))
-    syncLead(lead.id,{lifecycleStatus:'REJECTED',rejectionReason:reason}).catch(error=>setMessage(`Rejected locally; cloud sync failed: ${error.message}`))
-  }
-  async function restoreLead(lead){
-    const feedback=rejectFeedback[lead.id]||{}
-    let lifecycleStatus=feedback.previousLifecycleStatus||'REVIEW'
-    try{
-      const result=await syncLead(lead.id,{restore:true})
-      lifecycleStatus=result?.lifecycleStatus||lifecycleStatus
-    }catch(error){
-      if(!/not found/i.test(error.message)) setMessage(`Restored locally; cloud sync failed: ${error.message}`)
-    }
-    const nextRejected=rejected.filter(id=>id!==lead.id)
-    setRejected(nextRejected);persist('cravoe-scout-rejected',nextRejected)
-    const nextCrm={...crm,[lead.id]:{...(crm[lead.id]||{}),stage:lifecycleStatus}}
-    setCrm(nextCrm);persist('cravoe-scout-crm',nextCrm)
-    const restored={...lead,lifecycleStatus,rejectionReason:null,fitStatus:lifecycleStatus==='QUALIFIED'?'POSSIBLE_FIT':'REVIEW',automaticReject:false,tooBigForCravoe:false}
-    setResults(rows=>rows.some(row=>row.id===lead.id)?rows.map(row=>row.id===lead.id?restored:row):[restored,...rows])
-    setCloudRejected(rows=>rows.filter(row=>row.id!==lead.id))
-    setMessage(`Restored ${lead.name} to ${lifecycleStatus}.`)
-  }
-  async function retryResearch(lead){
-    setResults(rows=>rows.map(row=>row.id===lead.id?{...row,researchStatus:'researching',lifecycleStatus:'RESEARCHING',researchError:null}:row))
-    try{
-      const response=await fetch('/api/research',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(lead)})
-      const data=await response.json()
-      if(!response.ok) throw new Error(data.error||'Research retry failed')
-      const result={...lead,...data,lifecycleStatus:data.lifecycleStatus||lifecycleFromResearch(data)}
-      setResults(rows=>rows.map(row=>row.id===lead.id?result:row))
-      setMessage(`${lead.name}: research ${data.researchStatus||'complete'}.`)
-    }catch(error){
-      setResults(rows=>rows.map(row=>row.id===lead.id?{...row,researchStatus:'failed',lifecycleStatus:'REVIEW',researchError:error.message,fitStatus:'REVIEW'}:row))
-      setMessage(`${lead.name}: research retry failed.`)
-    }
-  }
-  async function toggleRejected(){
-    if(showRejected){setShowRejected(false);return}
-    setShowRejected(true)
-    try{
-      const response=await fetch('/api/leads?view=rejected')
-      const data=await response.json()
-      if(!response.ok) throw new Error(data.error||'Could not load rejected leads')
-      setCloudRejected(data.leads||[])
-    }catch(error){setMessage(`Showing browser rejections; cloud list unavailable: ${error.message}`)}
-  }
-  async function backupAndImportLocalData(){
-    const localState=Object.fromEntries(STORAGE_KEYS.map(key=>[key,localStorage.getItem(key)]).filter(([,value])=>value!==null))
-    if(!Object.keys(localState).length){setMessage('No legacy browser data was found to import.');return}
-    const backup=new Blob([JSON.stringify(localState,null,2)],{type:'application/json'})
-    const link=document.createElement('a')
-    link.href=URL.createObjectURL(backup)
-    link.download=`cravoe-local-backup-${new Date().toISOString().slice(0,10)}.json`
-    link.click()
-    URL.revokeObjectURL(link.href)
-    try{
-      const response=await fetch('/api/migration/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({localState})})
-      const data=await response.json()
-      if(!response.ok) throw new Error(data.error||'Import failed')
-      setMessage(`Backup downloaded · imported ${data.restaurants} leads · ${data.unresolved} unresolved · browser data preserved.`)
-    }catch(error){setMessage(`Backup downloaded; import failed and browser data was preserved: ${error.message}`)}
-  }
-  async function logout(){
-    await fetch('/api/auth/logout',{method:'POST'})
-    window.location.assign('/login')
+    updateCrm(lead.id,{stage:'Rejected'})
   }
   function findSimilar(lead){
     setCuisine(lead.cuisine)
@@ -337,11 +220,7 @@ export default function Home(){
   return <main className="shell">
     <header className="topbar">
       <div><div className="eyebrow">CRAVOE / ACQUISITION</div><h1>Vendor Scout</h1></div>
-      <div className="topbar-tools">
-        <div className="saved-pill">{saved.length} saved · {Object.values(crm).filter(x=>x.stage==='ONBOARDED').length} onboarded</div>
-        <button className="small-tool" onClick={backupAndImportLocalData}>Backup & import local data</button>
-        <button className="small-tool" onClick={logout}>Sign out</button>
-      </div>
+      <div className="saved-pill">{saved.length} saved · {Object.values(crm).filter(x=>x.stage==='Onboarded').length} onboarded</div>
     </header>
 
     <section className="hero">
@@ -374,9 +253,9 @@ export default function Home(){
       <div>
         <div className="section-title"><span>CANDIDATES</span><h3>{visible.length?`${visible.length} matches`:'Ready to scout'}</h3></div>
         {!visible.length&&!loading&&!stillVerifying.length&&<div className="empty"><strong>No verified Cravoe-fit leads yet</strong><p>Try another cuisine/zone or lower the review threshold.</p></div>}
-        {!!stillVerifying.length&&<div className="verifying-box"><strong>Verifying {stillVerifying.length} candidate{stillVerifying.length===1?'':'s'}…</strong><span>Research status is shown for each lead; failed checks can be retried.</span><div className="verifying-list">{stillVerifying.map(lead=><div key={lead.id}><span>{lead.name}</span><b>{lead.researchStatus||'pending'}</b></div>)}</div></div>}
+        {!!stillVerifying.length&&<div className="verifying-box"><strong>Verifying {stillVerifying.length} more candidate{stillVerifying.length===1?'':'s'}…</strong><span>They will not appear as leads until brand size and Cravoe fit are checked.</span></div>}
         <div className="cards">
-          {visible.map((lead,i)=><LeadCard key={lead.id} lead={lead} rank={i+1} saved={saved.some(s=>s.id===lead.id)} crm={crm[lead.id]||{stage:lead.lifecycleStatus||'NEW',note:lead.note||'',followUp:lead.followUp||''}} onSave={saveLead} onReject={rejectLead} onCopy={copyPhone} onCrm={updateCrm} onPersist={persistLeadFields} onRetry={retryResearch} onFindSimilar={findSimilar}/>)}
+          {visible.map((lead,i)=><LeadCard key={lead.id} lead={lead} rank={i+1} saved={saved.some(s=>s.id===lead.id)} crm={crm[lead.id]||{stage:'New',note:'',followUp:''}} onSave={saveLead} onReject={rejectLead} onCopy={copyPhone} onCrm={updateCrm} onFindSimilar={findSimilar}/>)}
         </div>
         {!!filteredOut.length&&<section className="filtered-section">
           <div className="section-title"><span>FILTERED OUT</span><h3>{filteredOut.length} brands outside Cravoe target</h3></div>
@@ -390,7 +269,7 @@ export default function Home(){
       </div>
       <aside>
         <div className="section-title"><span>PIPELINE</span><h3>Vendor acquisition</h3></div>
-        <div className="pipeline-stats">{CRM_STAGES.map(stage=><span key={stage}><b>{Object.values(crm).filter(x=>x.stage===stage).length}</b>{stage}</span>)}</div>
+        <div className="pipeline-stats">{CRM_STAGES.slice(0,6).map(stage=><span key={stage}><b>{Object.values(crm).filter(x=>x.stage===stage).length}</b>{stage}</span>)}</div>
         <div className="learning-box">
           <span>SCOUT LEARNING</span>
           <strong>{Object.keys(rejectFeedback).length} decisions learned</strong>
@@ -399,21 +278,17 @@ export default function Home(){
         <div className="section-title compact"><span>SHORTLIST</span><h3>Saved leads</h3></div>
         {!saved.length&&<p className="muted">Shortlist promising restaurants here. They stay saved on this browser.</p>}
         <div className="saved-list">{saved.slice(0,20).map(s=><div className="saved-item" key={s.id}><div><strong>{s.name}</strong><span>{s.area} · {s.cuisine}</span></div><b>{s.score}</b></div>)}</div>
-        <button className="small-tool rejected-toggle" onClick={toggleRejected}>{showRejected?'Hide rejected':'Show rejected'} · {rejectedCandidates.length}</button>
-        {showRejected&&<div className="rejected-list">{!rejectedCandidates.length&&<p className="muted">No rejected leads are recorded.</p>}{rejectedCandidates.map(lead=><div className="rejected-item" key={lead.id}><div><strong>{lead.name}</strong><span>{lead.area||'Area unavailable'} · {lead.rejectionReason||'Legacy rejection reason unavailable'}</span></div><button onClick={()=>restoreLead(lead)}>Restore</button></div>)}</div>}
       </aside>
     </section>
   </main>
 }
 
-function LeadCard({lead,rank,saved,crm,onSave,onReject,onCopy,onCrm,onPersist,onRetry,onFindSimilar}){
+function LeadCard({lead,rank,saved,crm,onSave,onReject,onCopy,onCrm,onFindSimilar}){
   const wa=whatsappUrl(lead)
   const [rejectReason,setRejectReason]=useState('Too big / too established')
   const outreach=outreachScore(lead)
   const why=whyLead(lead)
   const queryBase=`${lead.name} ${lead.area} Kolkata`
-  const researchStatus=lead.researchStatus||(lead.researched?'complete':lead.researchError?'failed':'pending')
-  const lifecycleStatus=lead.lifecycleStatus||lifecycleFromLegacyStage(crm.stage||'NEW')
   return <article className="lead-card">
     <div className="rank">#{String(rank).padStart(2,'0')}</div>
     {lead.photoName&&<a className="place-photo" href={lead.maps||'#'} target="_blank" rel="noreferrer"><img src={`/api/photo?name=${encodeURIComponent(lead.photoName)}`} alt={`${lead.name} Google Maps photo`} loading="lazy"/></a>}
@@ -423,7 +298,6 @@ function LeadCard({lead,rank,saved,crm,onSave,onReject,onCopy,onCrm,onPersist,on
         <div className="score"><strong>{lead.score}</strong><span>/100</span></div>
       </div>
       <div className="meta"><span>⭐ {lead.rating} <em>({Number(lead.reviews).toLocaleString('en-IN')})</em></span><span>📍 {lead.area}</span><span>🍽 {lead.cuisine}</span></div>
-      <div className="lead-states"><span>Lifecycle <b>{lifecycleStatus}</b></span><span>Research <b data-state={researchStatus}>{researchStatus}</b></span></div>
       <p className="address">{lead.address}</p>
       <div className="dual-scores">
         <div><span>CRAVOE FIT</span><strong>{lead.score}</strong><small>/100</small></div>
@@ -436,7 +310,7 @@ function LeadCard({lead,rank,saved,crm,onSave,onReject,onCopy,onCrm,onPersist,on
         <span>{lead.brandScanReason}</span>
         {!!lead.brandOutlets?.length&&<small>{lead.brandOutlets.slice(0,5).map(x=>x.address||x.name).join(' · ')}</small>}
       </div>}
-      {(lead.researched||researchStatus==='complete'||researchStatus==='partial')&&<div className={`research-box ${lead.fitStatus==='REJECT'?'research-reject':''}`}>
+      {lead.researched&&<div className={`research-box ${lead.fitStatus==='REJECT'?'research-reject':''}`}>
         <div className="research-head"><span>GEMINI INDEPENDENT RESEARCH</span><div className="research-head-badges">{lead.fitStatus&&<b className={`fit-badge ${lead.fitStatus==='REJECT'?'bad':lead.fitStatus==='STRONG_FIT'?'great':lead.fitStatus==='POSSIBLE_FIT'?'good':'warning'}`}>{lead.fitStatus.replace('_',' ')}</b>}<b className={`size-badge ${lead.sizeTone||''}`}>{lead.sizeClass}</b></div></div>
         <div className="research-stats">
           <span><strong>{lead.outletLabel||lead.estimatedOutlets}</strong> Kolkata outlet{lead.estimatedOutlets===1?'':'s'} supported</span>
@@ -450,14 +324,14 @@ function LeadCard({lead,rank,saved,crm,onSave,onReject,onCopy,onCrm,onPersist,on
         {!!lead.outletLocations?.length&&<div className="outlet-list">{lead.outletLocations.map((x,i)=><span key={i}>{x}</span>)}</div>}
         {!!lead.sources?.length&&<div className="research-sources">{lead.sources.map((src,i)=><a key={i} href={src.url} target="_blank" rel="noreferrer">{src.title||`Source ${i+1}`}</a>)}</div>}
       </div>}
-      {lead.researchError&&<div className="research-error">AI research unavailable · {lead.researchError}<button onClick={()=>onRetry(lead)} disabled={researchStatus==='researching'}>Retry research</button></div>}
+      {lead.researchError&&<div className="research-error">AI research unavailable · {lead.researchError}</div>}
 
       <div className="crm-box">
         <div className="crm-grid">
-          <label><span>Manual lifecycle override</span><select value={crm.stage||lifecycleStatus} onChange={e=>onCrm(lead.id,{stage:e.target.value})}>{CRM_STAGES.filter(x=>x!=='REJECTED').map(x=><option key={x}>{x}</option>)}</select></label>
-          <label><span>Follow up</span><input type="date" value={crm.followUp||''} onChange={e=>onCrm(lead.id,{followUp:e.target.value})} onBlur={e=>onPersist(lead.id,{followUp:e.currentTarget.value})}/></label>
+          <label><span>Stage</span><select value={crm.stage||'New'} onChange={e=>onCrm(lead.id,{stage:e.target.value})}>{CRM_STAGES.map(x=><option key={x}>{x}</option>)}</select></label>
+          <label><span>Follow up</span><input type="date" value={crm.followUp||''} onChange={e=>onCrm(lead.id,{followUp:e.target.value})}/></label>
         </div>
-        <label className="crm-note"><span>Notes</span><textarea value={crm.note||''} onChange={e=>onCrm(lead.id,{note:e.target.value})} onBlur={e=>onPersist(lead.id,{note:e.currentTarget.value})} placeholder="Owner name, call notes, objections, next step…"/></label>
+        <label className="crm-note"><span>Notes</span><textarea value={crm.note||''} onChange={e=>onCrm(lead.id,{note:e.target.value})} placeholder="Owner name, call notes, objections, next step…"/></label>
       </div>
 
       <div className="contact">
