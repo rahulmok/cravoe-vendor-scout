@@ -44,6 +44,8 @@ Do not commit `.env` files or secrets. Copy `.env.example` to `.env.local` for l
 
 ## Supabase setup and local-data import
 
+Vendor Scout persistence is isolated in `vendor_scout_*` tables/functions. It does **not** reuse or alter Cravoe's existing production `public.restaurants` or `vendor_prospects` records.
+
 1. Create a Supabase project and configure the variables above.
 2. Apply `supabase/migrations/20261003_000001_phase1_reliability.sql` using the Supabase SQL editor or CLI.
 3. Start the app and sign in with the internal passphrase.

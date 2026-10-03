@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { placeListingEvidence } from '../lib/evidence.js'
+import { placeListingEvidence, placeListingEvidenceRows } from '../lib/evidence.js'
 
 const lead = {
   google_place_id: 'ChIJ-AbC_123', name: 'Local Kitchen', address: 'Park Street', area: 'Central Kolkata',
@@ -32,4 +32,24 @@ test('legacy snapshots are explicitly marked as unknown evidence', () => {
   assert.equal(evidence.source_kind, 'legacy_local_storage')
   assert.equal(evidence.claim_status, 'unknown')
   assert.equal(evidence.confidence, null)
+})
+
+
+test('maps persisted restaurant IDs back to listing evidence rows', () => {
+  const rows = placeListingEvidenceRows(
+    [{ id: 'restaurant-uuid', google_place_id: lead.google_place_id }],
+    [lead],
+  )
+  assert.equal(rows.length, 1)
+  assert.equal(rows[0].restaurant_id, 'restaurant-uuid')
+  assert.equal(rows[0].claim_key, 'google_place_listing')
+})
+
+test('legacy evidence mapping skips demo-only browser records', () => {
+  const rows = placeListingEvidenceRows(
+    [{ id: 'restaurant-uuid', external_legacy_id: 'demo-7' }],
+    [{ google_place_id: null, external_legacy_id: 'demo-7', name: 'Demo' }],
+    { sourceKind: 'legacy_local_storage', claimStatus: 'unknown' },
+  )
+  assert.deepEqual(rows, [])
 })
