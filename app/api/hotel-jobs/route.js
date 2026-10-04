@@ -6,8 +6,8 @@ export const maxDuration=60;
 const throttle=new Map();
 export async function POST(request){
  try{
-  if(Number(request.headers.get('content-length'))>240000)return Response.json({error:'Too many candidates in one request'},{status:413});
-  const body=await request.json();if(body.runId&&validJob(body.runId,body.token)){const run=getRun(body.runId);if(['pending','running'].includes(await run.status))return Response.json({runId:body.runId,token:body.token,resumed:true});}
+  if(Number(request.headers.get('content-length'))>600000)return Response.json({error:'Too many candidates in one request'},{status:413});
+  const raw=await request.text();if(raw.length>600000)return Response.json({error:'Request is too large'},{status:413});const body=JSON.parse(raw);if(body.runId&&validJob(body.runId,body.token)){const run=getRun(body.runId);if(['pending','running'].includes(await run.status))return Response.json({runId:body.runId,token:body.token,resumed:true});}
   const ip=request.headers.get('x-forwarded-for')?.split(',')[0]||'local';const previous=throttle.get(ip)||0;if(Date.now()-previous<10000)return Response.json({error:'A job was just started. Wait a few seconds.'},{status:429});
   const regions=body.regionId==='all'?HOTEL_REGIONS:HOTEL_REGIONS.filter(r=>r.id===body.regionId);if(!regions.length)return Response.json({error:'Choose a valid district'},{status:400});
   const mode=body.mode==='research'?'research':'discover';
@@ -30,7 +30,7 @@ export async function GET(request){
  try{
   const run=getRun(runId);const status=await run.status;const index=Math.max(0,Number(url.searchParams.get('cursor'))||0);
   const stream=run.getReadable({startIndex:index});const tail=await stream.getTailIndex();const events=[];
-  if(tail>=index){const reader=stream.getReader();try{for(let i=index;i<=Math.min(tail,index+39);i++){const chunk=await reader.read();if(chunk.done)break;events.push(chunk.value)}}finally{await reader.cancel()}}
+  if(tail>=index){const reader=stream.getReader();try{for(let i=index;i<=Math.min(tail,index+7);i++){const chunk=await reader.read();if(chunk.done)break;events.push(chunk.value)}}finally{await reader.cancel()}}else{await stream.cancel()}
   return Response.json({status,events,cursor:index+events.length,tail},{headers:{'Cache-Control':'no-store'}});
  }catch(e){console.error('Hotel workflow status:',e.name);return Response.json({error:'Saved job progress is temporarily unavailable. Retry shortly.'},{status:502});}
 }

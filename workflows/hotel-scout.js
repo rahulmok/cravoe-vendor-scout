@@ -30,7 +30,7 @@ async function creatorSearch(region){
 creatorSearch.maxRetries=1;
 async function verifyHotel(hotel){'use step';await send({type:'research-start',id:hotel.id,message:`Checking ${hotel.name}: category, quality and creator posts`});const fresh=await getHotelPlace(hotel.placeId,hotel.regionId);return {...hotel,...fresh,collaborationEvidence:hotel.collaborationEvidence||[]};}
 verifyHotel.maxRetries=1;
-async function classifyHotel(hotel){'use step';return await classifyOneHotel(hotel)}
+async function classifyHotel(hotel){'use step';await send({type:'progress',message:`${hotel.name}: reading official pages and verifying category/quality`});const base=await classifyOneHotel(hotel);await send({type:'classification',hotel:{...base,researchStatus:'working'},message:`${hotel.name}: category check saved; checking creator platforms next`});return base}
 classifyHotel.maxRetries=1;
 async function platformResearch(hotel,platform){'use step';const result=await searchCreatorPlatform(hotel,platform);await send({type:'platform-progress',id:hotel.id,platform,message:`${hotel.name}: ${platform} checked · ${result.evidence.length} linked features`});return result;}
 platformResearch.maxRetries=1;
