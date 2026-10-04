@@ -48,7 +48,7 @@ export default function HotelScout(){
   const candidates=hotelsRef.current.filter(h=>h.discoverySource==='google-maps'&&hotelCandidateName(h.name)&&h.researchStatus!=='complete'&&(!ids||ids.has(h.id))&&(ids||region==='all'||h.regionId===region));
   const priority=h=>(crm[h.id]?.stage?1000:0)+(h.website?20:0)+(h.rating||0)*10+Math.min(h.reviews||0,1000)/100;
   const list=candidates.sort((a,b)=>priority(b)-priority(a)).slice(0,24);const tasks=[];
-  for(const r of HOTEL_REGIONS){const regional=list.filter(h=>h.regionId===r.id);for(let i=0;i<regional.length;i+=8)tasks.push({region:r,batch:regional.slice(i,i+8)});}
+  for(const r of HOTEL_REGIONS){const regional=list.filter(h=>h.regionId===r.id);for(let i=0;i<regional.length;i+=4)tasks.push({region:r,batch:regional.slice(i,i+4)});}
   let completed=0,failed=0,cursor=0,active=0;
   const progress=()=>setStatus(`Quick screening ${completed+failed}/${list.length} priority hotels · ${active} parallel batches. Stars, socials and contact routes first; creator history is checked on demand.`);
   async function worker(){while(!stop.current&&cursor<tasks.length){const {region:r,batch}=tasks[cursor++];active++;merge(batch.map(h=>({...h,researchStatus:'researching'})));progress();
@@ -56,7 +56,7 @@ export default function HotelScout(){
    catch(e){merge(batch.map(h=>({...h,researchStatus:stop.current?'pending':'failed',researchError:stop.current?null:e.message})));if(!stop.current){failed+=batch.length;setError(`Quick screening: ${e.name==='AbortError'?'Batch timed out; retry or deep-research a selected hotel.':e.message}`)}}
    finally{active--;progress()}
   }}
-  await Promise.all([worker(),worker()]);return {completed,failed,remaining:Math.max(0,candidates.length-completed)};
+  await Promise.all([worker(),worker(),worker()]);return {completed,failed,remaining:Math.max(0,candidates.length-completed)};
  }
  async function retryResearch(){if(busy||deepBusy)return;stop.current=false;setBusy(true);setError('');try{const done=await researchPending();setStatus(`${stop.current?'Research stopped.':'Research finished.'} ${done.completed} quick-screened · ${done.failed} need a retry · ${done.remaining} remain available.`)}finally{setBusy(false)}}
  async function scout(all=false,refresh=false){if(busy||deepBusy)return;stop.current=false;setBusy(true);setError('');const regions=all||region==='all'?HOTEL_REGIONS:[activeRegion];let fetched=0,failures=0;const ids=new Set();
