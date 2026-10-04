@@ -20,3 +20,5 @@
 .stay-exclusion{padding:12px 16px;border-left:2px solid #cda46a;background:rgba(205,164,106,.07);color:var(--ink);line-height:1.6}.stay-tabs{overflow-x:auto;white-space:nowrap}.stay-filters{flex-wrap:wrap}.stay-filters>.stay-secondary{min-height:48px}
 
 @media(max-width:800px){.stay-toolbar{flex-wrap:wrap}.stay-tabs{max-width:100%;width:100%}.stay-tabs button{flex-shrink:0}.stay-tools{margin-top:8px}.stay-filters>.stay-search{grid-column:1/-1}.stay-filters>.stay-secondary{font-size:11px;padding:9px}}
+
+.stay-load-more{display:flex;margin:28px auto}
