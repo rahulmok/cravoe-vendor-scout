@@ -1,6 +1,7 @@
 import {start,getRun} from 'workflow/api';
 import {hotelScoutWorkflow} from '../../../workflows/hotel-scout';
 import {HOTEL_REGIONS,scopeReason} from '../../../lib/hotel-regions';
+import {DISCOVERY_VERSION,excludedHotel} from '../../../lib/hotel-discovery';
 import {jobToken,validJob} from '../../../lib/hotel-job-auth';
 export const maxDuration=60;
 const throttle=new Map();
@@ -15,9 +16,9 @@ export async function POST(request){
   if(mode==='research'&&!hotels.length)return Response.json({error:'Choose eligible Maps properties for research'},{status:400});
   const tasks=[];
   if(mode==='discover')for(const region of regions)for(const town of region.areas.split(',').map(t=>t.trim())){
-   const old=body.coverage?.[region.id]?.[town];if(!body.refresh&&old?.status==='searched'&&!old.nextPageToken)continue;
+   const old=body.coverage?.[region.id]?.[town];if(!body.refresh&&old?.version===DISCOVERY_VERSION&&old?.status==='searched'&&!old.nextPageToken)continue;
    const pageToken=!body.refresh&&typeof old?.nextPageToken==='string'&&old.nextPageToken.length<=6000?old.nextPageToken:undefined;
-   tasks.push({regionId:region.id,district:region.name,town,pageToken,page:pageToken?(Number(old.page)||1)+1:1});
+   tasks.push({...(!body.refresh&&old?.version===DISCOVERY_VERSION?{version:old.version,pendingCells:old.pendingCells,saturatedCells:old.saturatedCells}:{}),regionId:region.id,district:region.name,town,pageToken,page:pageToken?(Number(old.page)||1)+1:1});
   }
   throttle.set(ip,Date.now());if(throttle.size>1000)throttle.delete(throttle.keys().next().value);
   const run=await start(hotelScoutWorkflow,[{mode,regions,tasks,hotels,skipIds:Array.isArray(body.skipIds)?body.skipIds.filter(x=>typeof x==='string').slice(0,5000):[]}]);

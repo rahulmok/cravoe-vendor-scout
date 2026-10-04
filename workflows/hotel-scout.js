@@ -1,19 +1,43 @@
 import {getWritable} from 'workflow';
-import {searchHotelPlaces,inHotelScope,placeHotel,getHotelPlace} from '../lib/hotel-maps';
+import {searchHotelPlaces,inHotelScope,placeHotel,getHotelPlace,isAccommodation,townBounds} from '../lib/hotel-maps';
 import {classifyOneHotel,searchCreatorPlatform,combineHotelResearch,creatorLedCandidates} from '../lib/hotel-agent';
 import {HOTEL_REGIONS,rankHotel,compareHotels} from '../lib/hotel-regions';
+import {DISCOVERY_VERSION,splitCell,researchQueue} from '../lib/hotel-discovery';
 import {sameProperty,normalize,preserveMaps} from '../lib/hotel-evidence';
 async function send(event){const writer=getWritable().getWriter();try{await writer.write({...event,time:new Date().toISOString()})}finally{writer.releaseLock()}}
 async function emit(event){'use step';await send(event)}
-async function discoverTown(task){
- 'use step';
- const query=`hotels and resorts in ${task.town}, ${task.district}, West Bengal, India`;
- const data=await searchHotelPlaces(query,task.pageToken);
- const hotels=(data.places||[]).filter(p=>inHotelScope(p)).map(p=>placeHotel(p,task.regionId,task.town));
- const coverage={regionId:task.regionId,town:task.town,page:task.page,nextPageToken:data.nextPageToken||null,returned:data.places?.length||0,excluded:(data.places?.length||0)-hotels.length,status:'searched',checkedAt:new Date().toISOString()};
- await send({type:'discovery',hotels,coverage});return hotels;
+async function discoverQuery(task,query,pageToken,bounds){
+ 'use step';const data=await searchHotelPlaces(query,pageToken,bounds);
+ const hotels=(data.places||[]).filter(isAccommodation).map(p=>placeHotel(p,task.regionId,task.town));
+ await send({type:'discovery',hotels});return {hotels,nextPageToken:data.nextPageToken||null,returned:data.places?.length||0};
 }
-discoverTown.maxRetries=1;
+discoverQuery.maxRetries=1;
+async function locateTown(task){'use step';return await townBounds(task.town,task.district)}
+locateTown.maxRetries=1;
+async function discoverTown(task){
+ const found=new Map();let requests=0,returned=0,pages=0,saturated=task.saturatedCells||0,boundaryMissing=false;
+ const collect=data=>{requests++;returned+=data.returned;for(const h of data.hotels)found.set(h.id,h)};
+ const resuming=task.version===DISCOVERY_VERSION&&Array.isArray(task.pendingCells)&&task.pendingCells.length;
+ if(!resuming)for(const term of ['hotels','resorts','luxury accommodation']){
+  let token;for(let page=0;page<3;page++){const data=await discoverQuery(task,`${term} in ${task.town}, ${task.district}, West Bengal, India`,token);collect(data);pages++;token=data.nextPageToken;if(!token)break;}
+ }
+ let cells=resuming?task.pendingCells:[];
+ if(!resuming&&!/district$|weekend resorts$/i.test(task.town)){
+  try{const bounds=await locateTown(task);if(bounds)cells=splitCell({bounds,depth:-1,key:task.town});else boundaryMissing=true}catch{boundaryMissing=true}
+ }
+ let scanned=0;
+ while(cells.length&&scanned<12){const cell=cells.shift();scanned++;
+  try{const data=await discoverQuery(task,'hotels and resorts',cell.pageToken,cell.bounds);collect(data);
+   if(data.returned>=20||data.nextPageToken){
+    if(cell.depth<3)cells.push(...splitCell(cell));
+    else if(data.nextPageToken&&(cell.page||1)<3)cells.push({...cell,pageToken:data.nextPageToken,page:(cell.page||1)+1});
+    else saturated++;
+   }
+  }catch{cells.unshift(cell);break;}
+ }
+ const coverage={regionId:task.regionId,town:task.town,version:DISCOVERY_VERSION,page:pages,nextPageToken:null,returned,unique:found.size,excluded:[...found.values()].filter(h=>h.qualification==='excluded').length,requests,cellsScanned:scanned,pendingCells:cells,saturatedCells:saturated,boundaryMissing,status:cells.length?'partial':'searched',checkedAt:new Date().toISOString()};
+ await emit({type:'discovery',hotels:[...found.values()],coverage,message:`${task.town}: ${found.size} properties collected${cells.length?` · ${cells.length} cells still to search`:''}${saturated?' · dense cells need further coverage':''}`});return [...found.values()];
+}
 async function creatorSearch(region){
  'use step';
  await send({type:'progress',message:`Finding creator-featured properties in ${region.name}`});
@@ -39,7 +63,7 @@ async function researchHotel(hotel){const original=await verifyHotel(hotel),base
 async function closeStream(){'use step';await getWritable().close()}
 async function safeResearch(hotel){try{return await researchHotel(hotel)}catch{await emit({type:'research-failed',id:hotel.id,message:`Research needs retry for ${hotel.name}. Other properties continue.`});return null}}
 async function mapsLane(tasks){const hotels=new Map();for(let i=0;i<tasks.length;i+=3){await emit({type:'progress',message:`Maps coverage: ${i+1}–${Math.min(i+3,tasks.length)} of ${tasks.length} town searches`});const batch=await Promise.all(tasks.slice(i,i+3).map(async task=>{try{return await discoverTown(task)}catch{await emit({type:'coverage-failed',coverage:{...task,status:'failed'},message:`Maps search needs retry: ${task.town}`});return []}}));for(const h of batch.flat())hotels.set(h.id,h);}return [...hotels.values()]}
-async function creatorsLane(regions,skipIds){const seen=new Set(skipIds),results=[];let researched=0;for(let i=0;i<regions.length;i+=2){const groups=await Promise.all(regions.slice(i,i+2).map(async region=>{try{return await creatorSearch(region)}catch{await emit({type:'creator-failed',regionId:region.id,message:`Creator discovery needs retry: ${region.name}`});return []}}));const candidates=groups.flat().sort((a,b)=>b.evidenceTier-a.evidenceTier||b.creatorCount-a.creatorCount);const selected=[];for(const h of candidates){if(!seen.has(h.id)&&researched<20){seen.add(h.id);selected.push(h);researched++;}}for(let j=0;j<selected.length;j+=2){results.push(...(await Promise.all(selected.slice(j,j+2).map(safeResearch))).filter(Boolean));}}return {results,researched,seen:[...seen]}}
+async function creatorsLane(regions){const hotels=new Map();for(let i=0;i<regions.length;i+=2){const groups=await Promise.all(regions.slice(i,i+2).map(async region=>{try{return await creatorSearch(region)}catch{await emit({type:'creator-failed',regionId:region.id,message:`Creator discovery needs retry: ${region.name}`});return []}}));for(const h of groups.flat())hotels.set(h.id,h)}return [...hotels.values()]}
 export async function hotelScoutWorkflow(options){
  'use workflow';
  await emit({type:'started',mode:options.mode,message:options.mode==='research'?'Selected hotel research started':'Live Maps and creator discovery started',districtCount:options.regions.length,townCount:options.tasks.length});
@@ -47,10 +71,14 @@ export async function hotelScoutWorkflow(options){
  if(options.mode==='research'){
   for(let i=0;i<options.hotels.length;i+=2)results.push(...(await Promise.all(options.hotels.slice(i,i+2).map(safeResearch))).filter(Boolean));
  }else{
-  const [discovered,creators]=await Promise.all([mapsLane(options.tasks),creatorsLane(options.regions,options.skipIds)]);
-  results.push(...creators.results);const seen=new Set(creators.seen);let remaining=Math.max(0,20-creators.researched);
-  const fallback=discovered.filter(h=>!seen.has(h.id)).sort((a,b)=>(b.rating||0)-(a.rating||0)||(b.reviews||0)-(a.reviews||0)).slice(0,remaining);
-  for(let i=0;i<fallback.length;i+=2)results.push(...(await Promise.all(fallback.slice(i,i+2).map(safeResearch))).filter(Boolean));
+  const discovered=await mapsLane(options.tasks);
+  await emit({type:'progress',message:'Maps collection finished for this pass. Finding creator signals before choosing a balanced research batch.'});
+  const creators=await creatorsLane(options.regions),all=new Map(discovered.map(h=>[h.id,h]));
+  for(const h of creators)all.set(h.id,{...all.get(h.id),...h});
+  const seen=new Set(options.skipIds);
+  const selected=researchQueue([...all.values()].filter(h=>!seen.has(h.id)),20);
+  await emit({type:'progress',message:`Inventory collected. Researching ${selected.length} properties fairly across destinations; remaining candidates stay saved.`});
+  for(let i=0;i<selected.length;i+=2)results.push(...(await Promise.all(selected.slice(i,i+2).map(safeResearch))).filter(Boolean));
  }
  const qualified=results.filter(h=>h.eligible).length;
  await emit({type:'complete',message:`Research pass finished: ${qualified} qualifying hotels. Remaining Maps candidates can be researched in another pass.`,researched:results.length,qualified});
