@@ -7,3 +7,6 @@ Maps results appear immediately. Automatic Gemini research checks every discover
 Legacy preloaded results are removed from Discover. Existing manual pipeline/notes are preserved; old backups can still be imported. Local storage version 2 retains Maps discoveries, pipeline, notes, follow-ups, profile and coverage cursors in this browser. JSON backups transfer work across devices. CSV exports filtered results. Outreach is user initiated.
 
 Uses the existing GOOGLE_PLACES_API_KEY and Vertex OIDC Gemini configuration on Vercel. The API key stays server side. The original restaurant scout is untouched.
+
+## Research speed
+Automatic research quick-screens at most 24 priority candidates, with two parallel workers and up to eight properties per batch. Classification and official contacts/socials only; influencer evidence is explicitly not searched in this pass. Deep research remains user initiated. Quick requests have a 90-second provider timeout and no automatic provider retries. Remaining records are visible and can be screened in further 24-property runs; failed records remain retryable. Existing notes and complete research are kept. Model remains gemini-3.8-flash.
