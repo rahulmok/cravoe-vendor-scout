@@ -1,1 +1,0 @@
-export default function MobilePreview(){return <main style={{minHeight:'100vh',background:'#101111',display:'flex',justifyContent:'center'}}><iframe title="Hotel scout mobile viewport" src="/hotels" style={{width:390,height:1100,border:0,flexShrink:0}}/></main>}
