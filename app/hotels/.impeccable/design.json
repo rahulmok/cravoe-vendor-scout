@@ -1,0 +1,466 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-04T07:10:00.228722+00:00",
+  "title": "Design System: Bengal Stay Scout",
+  "extensions": {
+    "shadows": [
+      {
+        "name": "toast",
+        "value": "0 8px 24px #11294b26",
+        "purpose": "Transient confirmation toast only."
+      }
+    ],
+    "motion": [
+      {
+        "name": "control-state",
+        "value": ".18s ease",
+        "purpose": "Background, border and text transitions."
+      },
+      {
+        "name": "row-border",
+        "value": ".2s ease",
+        "purpose": "Property row border changes."
+      },
+      {
+        "name": "toast-entry",
+        "value": ".25s cubic-bezier(.16,1,.3,1)",
+        "purpose": "Toast translation and blur entry; disabled for reduced motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "wide",
+        "value": "1500px"
+      },
+      {
+        "name": "compact-desktop",
+        "value": "1200px"
+      },
+      {
+        "name": "stacked-dossier",
+        "value": "1000px"
+      },
+      {
+        "name": "mobile",
+        "value": "700px"
+      }
+    ],
+    "colorMeta": {
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "tonalRamp": [
+          "oklch(15% 0.0627 261.42)",
+          "oklch(26% 0.0627 261.42)",
+          "oklch(38% 0.0627 261.42)",
+          "oklch(49% 0.0627 261.42)",
+          "oklch(61% 0.0627 261.42)",
+          "oklch(72% 0.0627 261.42)",
+          "oklch(84% 0.0627 261.42)",
+          "oklch(95% 0.0627 261.42)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted",
+        "tonalRamp": [
+          "oklch(15% 0.0421 261.14)",
+          "oklch(26% 0.0421 261.14)",
+          "oklch(38% 0.0421 261.14)",
+          "oklch(49% 0.0421 261.14)",
+          "oklch(61% 0.0421 261.14)",
+          "oklch(72% 0.0421 261.14)",
+          "oklch(84% 0.0421 261.14)",
+          "oklch(95% 0.0421 261.14)"
+        ]
+      },
+      "action": {
+        "role": "primary",
+        "displayName": "Action",
+        "tonalRamp": [
+          "oklch(15% 0.2241 264.57)",
+          "oklch(26% 0.2241 264.57)",
+          "oklch(38% 0.2241 264.57)",
+          "oklch(49% 0.2241 264.57)",
+          "oklch(61% 0.2241 264.57)",
+          "oklch(72% 0.2241 264.57)",
+          "oklch(84% 0.2241 264.57)",
+          "oklch(95% 0.2241 264.57)"
+        ]
+      },
+      "action-hover": {
+        "role": "primary",
+        "displayName": "Action Hover",
+        "tonalRamp": [
+          "oklch(15% 0.2113 264.14)",
+          "oklch(26% 0.2113 264.14)",
+          "oklch(38% 0.2113 264.14)",
+          "oklch(49% 0.2113 264.14)",
+          "oklch(61% 0.2113 264.14)",
+          "oklch(72% 0.2113 264.14)",
+          "oklch(84% 0.2113 264.14)",
+          "oklch(95% 0.2113 264.14)"
+        ]
+      },
+      "navigation": {
+        "role": "primary",
+        "displayName": "Navigation",
+        "tonalRamp": [
+          "oklch(15% 0.0674 259.13)",
+          "oklch(26% 0.0674 259.13)",
+          "oklch(38% 0.0674 259.13)",
+          "oklch(49% 0.0674 259.13)",
+          "oklch(61% 0.0674 259.13)",
+          "oklch(72% 0.0674 259.13)",
+          "oklch(84% 0.0674 259.13)",
+          "oklch(95% 0.0674 259.13)"
+        ]
+      },
+      "navigation-hover": {
+        "role": "primary",
+        "displayName": "Navigation Hover",
+        "tonalRamp": [
+          "oklch(15% 0.0769 257.72)",
+          "oklch(26% 0.0769 257.72)",
+          "oklch(38% 0.0769 257.72)",
+          "oklch(49% 0.0769 257.72)",
+          "oklch(61% 0.0769 257.72)",
+          "oklch(72% 0.0769 257.72)",
+          "oklch(84% 0.0769 257.72)",
+          "oklch(95% 0.0769 257.72)"
+        ]
+      },
+      "navigation-selected": {
+        "role": "primary",
+        "displayName": "Navigation Selected",
+        "tonalRamp": [
+          "oklch(15% 0.0800 255.44)",
+          "oklch(26% 0.0800 255.44)",
+          "oklch(38% 0.0800 255.44)",
+          "oklch(49% 0.0800 255.44)",
+          "oklch(61% 0.0800 255.44)",
+          "oklch(72% 0.0800 255.44)",
+          "oklch(84% 0.0800 255.44)",
+          "oklch(95% 0.0800 255.44)"
+        ]
+      },
+      "navigation-label": {
+        "role": "primary",
+        "displayName": "Navigation Label",
+        "tonalRamp": [
+          "oklch(15% 0.0367 257.40)",
+          "oklch(26% 0.0367 257.40)",
+          "oklch(38% 0.0367 257.40)",
+          "oklch(49% 0.0367 257.40)",
+          "oklch(61% 0.0367 257.40)",
+          "oklch(72% 0.0367 257.40)",
+          "oklch(84% 0.0367 257.40)",
+          "oklch(95% 0.0367 257.40)"
+        ]
+      },
+      "canvas": {
+        "role": "neutral",
+        "displayName": "Canvas",
+        "tonalRamp": [
+          "oklch(15% 0.0074 260.73)",
+          "oklch(26% 0.0074 260.73)",
+          "oklch(38% 0.0074 260.73)",
+          "oklch(49% 0.0074 260.73)",
+          "oklch(61% 0.0074 260.73)",
+          "oklch(72% 0.0074 260.73)",
+          "oklch(84% 0.0074 260.73)",
+          "oklch(95% 0.0074 260.73)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface",
+        "tonalRamp": [
+          "oklch(15% 0.0000 89.88)",
+          "oklch(26% 0.0000 89.88)",
+          "oklch(38% 0.0000 89.88)",
+          "oklch(49% 0.0000 89.88)",
+          "oklch(61% 0.0000 89.88)",
+          "oklch(72% 0.0000 89.88)",
+          "oklch(84% 0.0000 89.88)",
+          "oklch(95% 0.0000 89.88)"
+        ]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Border",
+        "tonalRamp": [
+          "oklch(15% 0.0156 257.20)",
+          "oklch(26% 0.0156 257.20)",
+          "oklch(38% 0.0156 257.20)",
+          "oklch(49% 0.0156 257.20)",
+          "oklch(61% 0.0156 257.20)",
+          "oklch(72% 0.0156 257.20)",
+          "oklch(84% 0.0156 257.20)",
+          "oklch(95% 0.0156 257.20)"
+        ]
+      },
+      "research-surface": {
+        "role": "neutral",
+        "displayName": "Research Surface",
+        "tonalRamp": [
+          "oklch(15% 0.0258 266.61)",
+          "oklch(26% 0.0258 266.61)",
+          "oklch(38% 0.0258 266.61)",
+          "oklch(49% 0.0258 266.61)",
+          "oklch(61% 0.0258 266.61)",
+          "oklch(72% 0.0258 266.61)",
+          "oklch(84% 0.0258 266.61)",
+          "oklch(95% 0.0258 266.61)"
+        ]
+      },
+      "focus": {
+        "role": "neutral",
+        "displayName": "Focus",
+        "tonalRamp": [
+          "oklch(15% 0.1386 268.07)",
+          "oklch(26% 0.1386 268.07)",
+          "oklch(38% 0.1386 268.07)",
+          "oklch(49% 0.1386 268.07)",
+          "oklch(61% 0.1386 268.07)",
+          "oklch(72% 0.1386 268.07)",
+          "oklch(84% 0.1386 268.07)",
+          "oklch(95% 0.1386 268.07)"
+        ]
+      },
+      "selected-border": {
+        "role": "neutral",
+        "displayName": "Selected Border",
+        "tonalRamp": [
+          "oklch(15% 0.1588 266.85)",
+          "oklch(26% 0.1588 266.85)",
+          "oklch(38% 0.1588 266.85)",
+          "oklch(49% 0.1588 266.85)",
+          "oklch(61% 0.1588 266.85)",
+          "oklch(72% 0.1588 266.85)",
+          "oklch(84% 0.1588 266.85)",
+          "oklch(95% 0.1588 266.85)"
+        ]
+      },
+      "confirmed-surface": {
+        "role": "secondary",
+        "displayName": "Confirmed Surface",
+        "tonalRamp": [
+          "oklch(15% 0.0225 164.50)",
+          "oklch(26% 0.0225 164.50)",
+          "oklch(38% 0.0225 164.50)",
+          "oklch(49% 0.0225 164.50)",
+          "oklch(61% 0.0225 164.50)",
+          "oklch(72% 0.0225 164.50)",
+          "oklch(84% 0.0225 164.50)",
+          "oklch(95% 0.0225 164.50)"
+        ]
+      },
+      "confirmed-text": {
+        "role": "secondary",
+        "displayName": "Confirmed Text",
+        "tonalRamp": [
+          "oklch(15% 0.0696 162.91)",
+          "oklch(26% 0.0696 162.91)",
+          "oklch(38% 0.0696 162.91)",
+          "oklch(49% 0.0696 162.91)",
+          "oklch(61% 0.0696 162.91)",
+          "oklch(72% 0.0696 162.91)",
+          "oklch(84% 0.0696 162.91)",
+          "oklch(95% 0.0696 162.91)"
+        ]
+      },
+      "signal-surface": {
+        "role": "secondary",
+        "displayName": "Signal Surface",
+        "tonalRamp": [
+          "oklch(15% 0.0366 80.63)",
+          "oklch(26% 0.0366 80.63)",
+          "oklch(38% 0.0366 80.63)",
+          "oklch(49% 0.0366 80.63)",
+          "oklch(61% 0.0366 80.63)",
+          "oklch(72% 0.0366 80.63)",
+          "oklch(84% 0.0366 80.63)",
+          "oklch(95% 0.0366 80.63)"
+        ]
+      },
+      "signal-text": {
+        "role": "secondary",
+        "displayName": "Signal Text",
+        "tonalRamp": [
+          "oklch(15% 0.0932 72.96)",
+          "oklch(26% 0.0932 72.96)",
+          "oklch(38% 0.0932 72.96)",
+          "oklch(49% 0.0932 72.96)",
+          "oklch(61% 0.0932 72.96)",
+          "oklch(72% 0.0932 72.96)",
+          "oklch(84% 0.0932 72.96)",
+          "oklch(95% 0.0932 72.96)"
+        ]
+      },
+      "unknown-surface": {
+        "role": "neutral",
+        "displayName": "Unknown Surface",
+        "tonalRamp": [
+          "oklch(15% 0.0091 258.34)",
+          "oklch(26% 0.0091 258.34)",
+          "oklch(38% 0.0091 258.34)",
+          "oklch(49% 0.0091 258.34)",
+          "oklch(61% 0.0091 258.34)",
+          "oklch(72% 0.0091 258.34)",
+          "oklch(84% 0.0091 258.34)",
+          "oklch(95% 0.0091 258.34)"
+        ]
+      },
+      "unknown-text": {
+        "role": "neutral",
+        "displayName": "Unknown Text",
+        "tonalRamp": [
+          "oklch(15% 0.0467 258.76)",
+          "oklch(26% 0.0467 258.76)",
+          "oklch(38% 0.0467 258.76)",
+          "oklch(49% 0.0467 258.76)",
+          "oklch(61% 0.0467 258.76)",
+          "oklch(72% 0.0467 258.76)",
+          "oklch(84% 0.0467 258.76)",
+          "oklch(95% 0.0467 258.76)"
+        ]
+      },
+      "stage-surface": {
+        "role": "secondary",
+        "displayName": "Stage Surface",
+        "tonalRamp": [
+          "oklch(15% 0.0271 267.53)",
+          "oklch(26% 0.0271 267.53)",
+          "oklch(38% 0.0271 267.53)",
+          "oklch(49% 0.0271 267.53)",
+          "oklch(61% 0.0271 267.53)",
+          "oklch(72% 0.0271 267.53)",
+          "oklch(84% 0.0271 267.53)",
+          "oklch(95% 0.0271 267.53)"
+        ]
+      },
+      "stage-text": {
+        "role": "secondary",
+        "displayName": "Stage Text",
+        "tonalRamp": [
+          "oklch(15% 0.1418 263.01)",
+          "oklch(26% 0.1418 263.01)",
+          "oklch(38% 0.1418 263.01)",
+          "oklch(49% 0.1418 263.01)",
+          "oklch(61% 0.1418 263.01)",
+          "oklch(72% 0.1418 263.01)",
+          "oklch(84% 0.1418 263.01)",
+          "oklch(95% 0.1418 263.01)"
+        ]
+      },
+      "starter-surface": {
+        "role": "secondary",
+        "displayName": "Starter Surface",
+        "tonalRamp": [
+          "oklch(15% 0.0152 302.55)",
+          "oklch(26% 0.0152 302.55)",
+          "oklch(38% 0.0152 302.55)",
+          "oklch(49% 0.0152 302.55)",
+          "oklch(61% 0.0152 302.55)",
+          "oklch(72% 0.0152 302.55)",
+          "oklch(84% 0.0152 302.55)",
+          "oklch(95% 0.0152 302.55)"
+        ]
+      },
+      "starter-text": {
+        "role": "secondary",
+        "displayName": "Starter Text",
+        "tonalRamp": [
+          "oklch(15% 0.0846 302.89)",
+          "oklch(26% 0.0846 302.89)",
+          "oklch(38% 0.0846 302.89)",
+          "oklch(49% 0.0846 302.89)",
+          "oklch(61% 0.0846 302.89)",
+          "oklch(72% 0.0846 302.89)",
+          "oklch(84% 0.0846 302.89)",
+          "oklch(95% 0.0846 302.89)"
+        ]
+      }
+    }
+  },
+  "components": [
+    {
+      "name": "Primary button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Primary button from the hotel workspace.",
+      "html": "<button class=\"ds-primary\">Find hotel leads</button>",
+      "css": ".ds-primary{font-family:'Stay Sans',Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:10px 16px;border:1px solid #2558e8;background:#2558e8;color:#fff;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:background .18s ease,border-color .18s ease,color .18s ease}.ds-primary:hover{background:#1646cb;border-color:#1646cb}.ds-primary:focus-visible{outline:3px solid #7a9af5;outline-offset:3px}"
+    },
+    {
+      "name": "Secondary button",
+      "kind": "button",
+      "refersTo": "",
+      "description": "Secondary button from the hotel workspace.",
+      "html": "<button class=\"ds-secondary\">Export leads</button>",
+      "css": ".ds-secondary{font-family:'Stay Sans',Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:10px 16px;border:1px solid #cbd6e8;background:#fff;color:#122342;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:background .18s ease,border-color .18s ease,color .18s ease}.ds-secondary:hover{background:#edf2ff;border-color:#a9bfe9}.ds-secondary:focus-visible{outline:3px solid #7a9af5;outline-offset:3px}"
+    },
+    {
+      "name": "Search field",
+      "kind": "input",
+      "refersTo": "",
+      "description": "Search field from the hotel workspace.",
+      "html": "<label class=\"ds-search\"><input aria-label=\"Search hotels\" placeholder=\"Search hotel or town\"></label>",
+      "css": ".ds-search{font-family:'Stay Sans',Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;display:flex;padding:0 12px;border:1px solid #dce3ed;border-radius:7px;background:#fff}.ds-search input{font-family:'Stay Sans',Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;width:100%;min-width:0;padding:11px 0;border:0;background:transparent;color:#122342;font-size:14px;outline:none}.ds-search:focus-within{outline:2px solid #7a9af5;outline-offset:2px}.ds-search input::placeholder{color:#64728b}"
+    },
+    {
+      "name": "Navigation",
+      "kind": "nav",
+      "refersTo": "",
+      "description": "Navigation from the hotel workspace.",
+      "html": "<nav class=\"ds-nav\"><button class=\"ds-current\">Discover</button><button>My pipeline</button></nav>",
+      "css": ".ds-nav{font-family:'Stay Sans',Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#102546;padding:20px;display:flex;flex-direction:column;gap:6px}.ds-nav button{font-family:'Stay Sans',Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;text-align:left;border:0;border-radius:8px;background:transparent;color:#b9c9e0;padding:13px 12px;min-height:48px;font-size:14px;cursor:pointer}.ds-nav button:hover{background:#1a355c;color:#fff}.ds-nav .ds-current{background:#24446d;color:#fff}.ds-nav button:focus-visible{outline:3px solid #7a9af5;outline-offset:3px}"
+    },
+    {
+      "name": "Evidence chip",
+      "kind": "chip",
+      "refersTo": "",
+      "description": "Evidence chip from the hotel workspace.",
+      "html": "<span class=\"ds-proof\">Collaboration evidence</span>",
+      "css": ".ds-proof{font-family:'Stay Sans',Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;display:inline-flex;border-radius:5px;background:#dceee5;color:#245a43;padding:4px 7px;font-size:11px;line-height:1.3}"
+    },
+    {
+      "name": "Property row",
+      "kind": "card",
+      "refersTo": "property-row",
+      "description": "Property row from the hotel workspace.",
+      "html": "<article class=\"ds-row\"><button><small>Darjeeling \u00b7 Ownership unconfirmed</small><h3>Property name</h3><p>Source-backed property summary.</p></button></article>",
+      "css": ".ds-row{font-family:'Stay Sans',Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;border:1px solid #dce3ed;border-radius:12px;background:#fff;overflow:hidden;transition:border-color .2s ease}.ds-row button{font-family:'Stay Sans',Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;width:100%;text-align:left;border:0;background:none;padding:19px;color:#122342;cursor:pointer}.ds-row button:hover{background:#fafcff}.ds-row button:focus-visible{outline:3px solid #7a9af5;outline-offset:3px}.ds-row h3{font-size:21px;font-weight:650;line-height:1.2;letter-spacing:-.025em;margin:0 0 8px}.ds-row small{font-size:12px;color:#5d6d86}.ds-row p{font-size:13px;line-height:1.6;color:#57657d}"
+    },
+    {
+      "name": "Property dossier",
+      "kind": "custom",
+      "refersTo": "dossier",
+      "description": "Property dossier from the hotel workspace.",
+      "html": "<aside class=\"ds-dossier\"><small>Property dossier</small><h2>Property name</h2><div class=\"ds-tabs\"><button class=\"ds-active\">Evidence &amp; contacts</button><button>Outreach</button></div><p>Inspect the classification source and creator evidence.</p></aside>",
+      "css": ".ds-dossier{font-family:'Stay Sans',Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#fff;border:1px solid #dce3ed;border-radius:12px;padding:20px;color:#122342}.ds-dossier small{font-size:12px;color:#61708a}.ds-dossier h2{font-size:24px;line-height:1.2;letter-spacing:-.025em}.ds-dossier p{font-size:13px;line-height:1.6;color:#57657d}.ds-tabs{display:flex;gap:16px;border-bottom:1px solid #dce3ed}.ds-tabs button{font-family:'Stay Sans',Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;border:0;border-bottom:2px solid transparent;padding:11px 0;background:none;font-size:13px;color:#5d6b85;cursor:pointer}.ds-tabs button:hover{color:#2558e8}.ds-tabs .ds-active{border-bottom-color:#2558e8;color:#2558e8}.ds-tabs button:focus-visible{outline:3px solid #7a9af5;outline-offset:3px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Property Research Desk",
+    "overview": "A composed research workspace: a dark navigation spine anchors white property records and a source-rich dossier. Manrope supplies a confident, compact hierarchy; cobalt marks actions and selection, while restrained status colors express evidence quality.\n\nThis is a code-led snapshot scoped to `app/hotels`; the metaphor describes the implemented system and is not a separately approved brand identity.",
+    "keyCharacteristics": [
+      "Navy navigation and cobalt actions",
+      "White evidence-led property rows",
+      "Compact Manrope hierarchy",
+      "Borders and tonal layers before shadows"
+    ],
+    "rules": [],
+    "dos": [
+      "Do keep hotel category, guest rating and fit score visually distinct.",
+      "Do pair evidence colors with readable status text.",
+      "Do retain visible focus treatment and reduced-motion support."
+    ],
+    "donts": [
+      "Don't use property photography as a substitute for evidence.",
+      "Don't spread the action cobalt across every surface.",
+      "Don't apply this scoped hotel system to the restaurant scout."
+    ]
+  }
+}
