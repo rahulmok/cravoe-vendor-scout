@@ -22,3 +22,4 @@
 @media(max-width:800px){.stay-toolbar{flex-wrap:wrap}.stay-tabs{max-width:100%;width:100%}.stay-tabs button{flex-shrink:0}.stay-tools{margin-top:8px}.stay-filters>.stay-search{grid-column:1/-1}.stay-filters>.stay-secondary{font-size:11px;padding:9px}}
 
 .stay-load-more{display:flex;margin:28px auto}
+.stay-status-badge{display:inline-flex;margin-bottom:12px;padding:5px 10px;border:1px solid #626453;border-radius:20px;font-size:11px;letter-spacing:.04em;color:#d8cbaa}.stay-status-badge.qualified{border-color:#739477;color:#a9c9ae}.stay-status-badge.excluded,.stay-status-badge.below-category{border-color:#aa706b;color:#dfaaa3}

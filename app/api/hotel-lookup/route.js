@@ -1,11 +1,16 @@
+import {hotelStore} from '../../../lib/hotel-store';
+import {requireSession} from '../../../lib/hotel-session';
+import {geographicHotel} from '../../../lib/hotel-boundaries';
+import {rankHotel} from '../../../lib/hotel-regions';
 import {HOTEL_REGIONS} from '../../../lib/hotel-regions';
 import {searchHotelPlaces,isAccommodation,placeHotel} from '../../../lib/hotel-maps';
 export const maxDuration=60;
-export async function POST(request){try{
+export async function POST(request){const denied=requireSession(request);if(denied)return denied;try{
  const raw=await request.text();if(raw.length>3000)return Response.json({error:'Request too large'},{status:413});const b=JSON.parse(raw);
  const query=typeof b.query==='string'?b.query.trim():'';if(query.length<3||query.length>160)return Response.json({error:'Enter a hotel name of 3–160 characters'},{status:400});
- const region=HOTEL_REGIONS.find(r=>r.id===b.regionId);if(b.regionId!=='all'&&!region)return Response.json({error:'Choose a valid destination'},{status:400});
+ const region=HOTEL_REGIONS.find(r=>r.id===b.regionId);if(!['all','coastal-belt'].includes(b.regionId)&&!region)return Response.json({error:'Choose a valid destination'},{status:400});
  const data=await searchHotelPlaces(`${query}, ${region?.name||'West Bengal'}, India`);
- const hotels=(data.places||[]).filter(isAccommodation).map(p=>placeHotel(p,region?.id||null,null));
+ const rawHotels=(data.places||[]).filter(isAccommodation).map(p=>{const h=geographicHotel(placeHotel(p,region?.id||null,null));return {...h,...rankHotel(h)}});
+ const hotels=await hotelStore('upsert',{hotels:rawHotels});
  return Response.json({hotels,query,nextPageToken:data.nextPageToken||null,note:'Live Maps matches. Category and creator history need research; excluded matches remain visible.'});
  }catch(e){return Response.json({error:e.message||'Live Maps lookup failed'},{status:502})}}
