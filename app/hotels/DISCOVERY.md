@@ -69,3 +69,5 @@ Boundary provenance and limitations:
 - `tests/hotel-store.test.sql`: transactional deduplication, CRM retention, source barrier, exclusive claims, replayed checkpoints, false completion prevention, blocked-cell resumption, global excluded search and anonymous-access protection. Entire test rolls back.
 - Next.js production build compiles both durable workflows.
 - Test small geographic selections before initiating a statewide scan; full coverage is a substantial persistent queue, not one fast Gemini answer.
+
+Live shoreline correction: district bounds and intersection tests include a 2 km rectangular tolerance. Listings near a coarse state border are retained as Needs review and cannot qualify until their location is verified; the Kolkata, Purulia and Sundarbans masks still apply first. This is a general boundary rule, not a property-name exception.

@@ -3,7 +3,7 @@ import {generateGrid,cellCircle,distanceMeters,quadSplit,containsPoint,pointInGe
 import {jaroWinkler,sameHotelIdentity,mergeHotelIdentity} from '../lib/hotel-identity';
 import {placesRequest} from '../lib/hotel-grid-places';
 import {cellProgress} from '../lib/hotel-cell-plan';
-import {coordinateExclusion,areaCells,GEOGRAPHIC_AREAS} from '../lib/hotel-boundaries';
+import {coordinateExclusion,boundaryReview,areaCells,GEOGRAPHIC_AREAS} from '../lib/hotel-boundaries';
 import {osmHotels,overpassQuery} from '../lib/hotel-overpass';
 import {creatorStats,qualification} from '../lib/hotel-regions';
 const cells=[...generateGrid(COASTAL_BOUNDS)];assert(cells.length>100);
@@ -15,6 +15,7 @@ assert.equal(cellProgress(cell,{returned:20}).children.length,4);assert.equal(ce
 const a={placeId:'map-a',name:'Parth King Beach Resort',location:{latitude:21.667,longitude:87.697}};const b={osmId:'way:123',name:'Parth King Resort Chawlkhola',location:{latitude:21.6671,longitude:87.6971}};assert(jaroWinkler(a.name,b.name)>.82);assert(sameHotelIdentity(a,b));assert(!sameHotelIdentity(a,{...b,location:{latitude:21.7,longitude:87.7}}));assert(!sameHotelIdentity(a,{...b,name:'Sea Pearl Hotel'}));assert(!sameHotelIdentity({...b,name:'Unnamed accommodation (way:123)'},{...b,osmId:'way:124',name:'Unnamed accommodation (way:124)'}));
 assert.equal(mergeHotelIdentity({...a,researchStatus:'complete',stars:4},{...b,researchStatus:'pending',stars:null}).stars,4);
 assert.equal(coordinateExclusion({latitude:21.667,longitude:87.697}),null);assert.match(coordinateExclusion({latitude:22.5726,longitude:88.3639}),/Kolkata/);assert.match(coordinateExclusion({latitude:23.3322,longitude:86.365}),/Purulia/);assert.match(coordinateExclusion({latitude:22.12,longitude:88.85}),/Sundarbans/);assert.match(coordinateExclusion({latitude:27.33,longitude:88.61}),/Outside/);
+const shoreline={latitude:21.6705697,longitude:87.7198302};assert.equal(coordinateExclusion(shoreline),null);assert(boundaryReview(shoreline));assert.equal(qualification({name:'Border Resort',location:shoreline,stars:4,starSource:'https://agoda.com/property',starEvidence:'4-star hotel'}).qualification,'verify');
 assert(GEOGRAPHIC_AREAS.some(a=>a.id==='coastal-belt'));assert.equal(GEOGRAPHIC_AREAS.filter(a=>a.id!=='coastal-belt').length,21);assert([...areaCells(['coastal-belt'],'osm')].length>0);
 assert.match(overpassQuery(COASTAL_BOUNDS),/nwr/);assert.throws(()=>osmHotels({elements:[],remark:'runtime error: timeout'}),/incomplete/);
 const osm=osmHotels({elements:[{type:'way',id:12,center:{lat:21.667,lon:87.697},tags:{tourism:'hotel',name:'Mapped Stay',stars:'4'},geometry:[{lat:21.667,lon:87.697}]}]})[0];assert.equal(osm.osmId,'way:12');assert.equal(osm.stars,null);assert(osm.osmGeometry);assert(!osm.eligible);
