@@ -1,9 +1,9 @@
 # Bengal Stay Scout
 
-Independent hotel workspace at /hotels, using the existing Vertex OIDC / Gemini research integration. The configured model was verified as gemini-3.8-flash.
+Live discovery at /hotels uses Places API (New) Text Search, one town at a time across 12 regional clusters. There are no bundled hotel records. Every result is deduplicated by Google Place ID; state/country/locality/types and closure status are checked before display. Search returns one page per town per pass and retains nextPageToken cursors for additional passes. Refresh Maps restarts a pass. Maps does not guarantee exhaustive coverage.
 
-The initial snapshot contains 107 candidates across 12 regional clusters, not an exhaustive or fully verified directory. 3–5 star classifications require linked category evidence; guest ratings remain separate. Unknown categories remain in verification. Creator coverage is a signal unless a concrete paid/hosted disclosure is present. Historic disclosures do not establish current budgets.
+Maps results appear immediately. Automatic Gemini research checks every discovered property in batches of four, preserving Maps identity, address, rating and photos. Matched properties receive sourced classification, socials, contact routes, creator disclosures and pitch ideas. Missing or failed research remains visible and can be retried. Hotel star categories are distinct from guest ratings. A normal phone number is never assumed to be WhatsApp. Historical creator evidence does not establish present availability or budget.
 
-Discovery supports regional batches, cancellation, retries and deep property research. Dossiers include source links, public contact routes, real Places photos where matched, social profiles and tailored pitches. WhatsApp requires official explicit evidence.
+Legacy preloaded results are removed from Discover. Existing manual pipeline/notes are preserved; old backups can still be imported. Local storage version 2 retains Maps discoveries, pipeline, notes, follow-ups, profile and coverage cursors in this browser. JSON backups transfer work across devices. CSV exports filtered results. Outreach is user initiated.
 
-Pipeline, notes, follow-ups, drafts and creator profile persist in browser localStorage. Use JSON backup/import to transfer devices. CSV exports the filtered results and escapes formula prefixes. Outreach is user-initiated; the application does not automatically send messages.
+Uses the existing GOOGLE_PLACES_API_KEY and Vertex OIDC Gemini configuration on Vercel. The API key stays server side. The original restaurant scout is untouched.
